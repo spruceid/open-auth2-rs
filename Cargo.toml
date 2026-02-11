@@ -1,0 +1,24 @@
+[package]
+name = "open-auth2"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+reqwest = ["dep:reqwest"]
+axum = ["dep:axum"]
+
+[dependencies]
+base64 = "0.22.1"
+iref = { version = "3.2.2", features = ["serde"] }
+rand = "0.10.0"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_html_form = "0.4.0"
+sha2 = "0.10.9"
+str-newtype = "2.0.0"
+thiserror = "2.0.18"
+http = "1.4.0"
+serde_json = "1.0.149"
+serde_with = "3.16.1"
+
+reqwest = { version = "0.13.2", optional = true }
+axum = { version = "0.8.8", optional = true }
