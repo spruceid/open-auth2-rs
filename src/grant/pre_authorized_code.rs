@@ -8,7 +8,7 @@ use crate::{
 	ClientIdBuf,
 	client::{OAuth2Client, OAuth2ClientError},
 	endpoints::{
-		Request, SendRequest,
+		SendRequest,
 		authorization::AuthorizationEndpointLike,
 		token::{TokenEndpoint, TokenRequestBuilder, TokenResponse},
 	},
@@ -96,8 +96,6 @@ impl PreAuthorizedCodeTokenRequest {
 		}
 	}
 }
-
-impl Request for PreAuthorizedCodeTokenRequest {}
 
 impl<'a, C> SendRequest<TokenEndpoint<'a, C>> for PreAuthorizedCodeTokenRequest
 where

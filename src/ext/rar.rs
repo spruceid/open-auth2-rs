@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::ops::{Deref, DerefMut};
 
 use crate::{
-	endpoints::{Redirect, Request, RequestBuilder, SendRequest},
+	endpoints::{Redirect, RequestBuilder, SendRequest},
 	oauth2_extension,
 };
 
@@ -58,13 +58,6 @@ oauth2_extension! {
 
 		=> #[serde(flatten)]
 	}
-}
-
-impl<'a, T, D> Request for WithAuthorizationDetails<'a, D, T>
-where
-	T: Request,
-	D: AuthorizationDetailsObject,
-{
 }
 
 impl<'a, T, D, E> SendRequest<E> for WithAuthorizationDetails<'a, D, T>

@@ -13,20 +13,18 @@ pub mod token;
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct NoExtension {}
 
+pub trait Endpoint {
+	type Client;
+
+	fn client(&self) -> &Self::Client;
+}
+
 pub trait Redirect {
 	type RequestBody<'b>: Serialize
 	where
 		Self: 'b;
 
 	fn build_query(&self) -> Self::RequestBody<'_>;
-}
-
-pub trait Request {}
-
-pub trait Endpoint {
-	type Client;
-
-	fn client(&self) -> &Self::Client;
 }
 
 pub trait SendRequest<E>: Sized {

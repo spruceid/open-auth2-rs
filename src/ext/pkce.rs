@@ -10,7 +10,7 @@ use sha2::{Digest, Sha256};
 use str_newtype::StrNewType;
 
 use crate::{
-	endpoints::{Redirect, Request, RequestBuilder, SendRequest},
+	endpoints::{Redirect, RequestBuilder, SendRequest},
 	oauth2_extension,
 };
 
@@ -23,8 +23,6 @@ oauth2_extension! {
 		=> #[serde(flatten)]
 	}
 }
-
-impl<T> Request for WithPkceChallenge<T> where T: Request {}
 
 impl<T> Redirect for WithPkceChallenge<T>
 where
@@ -65,8 +63,6 @@ oauth2_extension! {
 		=> #[serde(flatten)]
 	}
 }
-
-impl<'a, T> Request for WithPkceVerifier<'a, T> where T: Request {}
 
 impl<'a, T, E> SendRequest<E> for WithPkceVerifier<'a, T>
 where

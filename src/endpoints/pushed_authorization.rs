@@ -14,7 +14,7 @@ use crate::{
 	ClientIdBuf,
 	client::{OAuth2Client, OAuth2ClientError},
 	endpoints::{
-		Redirect, Request, RequestBuilder, SendRequest,
+		Redirect, RequestBuilder, SendRequest,
 		authorization::{AuthorizationEndpoint, AuthorizationEndpointLike},
 	},
 	http::{APPLICATION_JSON, HttpClient, WwwFormUrlEncoded, expect_content_type},
@@ -79,7 +79,7 @@ impl<'a, C, T> PushedAuthorizationRequestBuilder<'a, C, T> {
 
 impl<'a, C, T> PushedAuthorizationRequestBuilder<'a, C, T>
 where
-	T: Request + Redirect,
+	T: Redirect,
 {
 	pub async fn send(
 		self,
@@ -106,7 +106,7 @@ pub struct Pushed<T>(T);
 
 impl<'a, C, T> SendRequest<PushedAuthorizationEndpoint<'a, C>> for Pushed<T>
 where
-	T: Request + Redirect,
+	T: Redirect,
 {
 	type ContentType = WwwFormUrlEncoded;
 	type RequestBody<'b>

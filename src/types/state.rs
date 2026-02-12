@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use str_newtype::StrNewType;
 
-use crate::endpoints::{Redirect, Request, RequestBuilder};
+use crate::endpoints::{Redirect, RequestBuilder};
 
 use super::is_vschar;
 
@@ -91,8 +91,6 @@ impl<T> DerefMut for Stateful<T> {
 		&mut self.value
 	}
 }
-
-impl<T> Request for Stateful<T> where T: Request {}
 
 impl<T> Redirect for Stateful<T>
 where

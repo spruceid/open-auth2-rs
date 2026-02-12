@@ -9,7 +9,7 @@ use crate::{
 	ClientIdBuf, CodeBuf, IntoScope, ScopeBuf, StateBuf, Stateful,
 	client::{OAuth2Client, OAuth2ClientError},
 	endpoints::{
-		Redirect, Request, SendRequest,
+		Redirect, SendRequest,
 		authorization::{
 			AuthorizationEndpoint, AuthorizationEndpointLike, AuthorizationRequestBuilder,
 		},
@@ -136,8 +136,6 @@ impl AuthorizationCodeAuthorizationRequest {
 	}
 }
 
-impl Request for AuthorizationCodeAuthorizationRequest {}
-
 impl Redirect for AuthorizationCodeAuthorizationRequest {
 	type RequestBody<'b>
 		= &'b Self
@@ -219,8 +217,6 @@ impl AuthorizationCodeTokenRequest {
 		}
 	}
 }
-
-impl Request for AuthorizationCodeTokenRequest {}
 
 impl<'a, C> SendRequest<TokenEndpoint<'a, C>> for AuthorizationCodeTokenRequest
 where
