@@ -1,21 +1,21 @@
 //! Authorization Code Grant.
 //!
 //! See: <https://datatracker.ietf.org/doc/html/rfc6749#section-4.1>
-use iref::{Uri, UriBuf, uri::QueryBuf};
+use iref::{Uri, UriBuf};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::{
-	IntoScope, ScopeBuf,
+	ClientIdBuf, CodeBuf, IntoScope, ScopeBuf, StateBuf, Stateful,
 	client::{OAuth2Client, OAuth2ClientError},
 	endpoints::{
-		Redirect, Request, SendRequest, Stateful,
+		Redirect, Request, SendRequest,
 		authorization::{
 			AuthorizationEndpoint, AuthorizationEndpointLike, AuthorizationRequestBuilder,
 		},
-		token::{TokenEndpoint, TokenResponse},
+		token::{TokenEndpoint, TokenRequestBuilder, TokenResponse},
 	},
-	http::{self, APPLICATION_JSON, expect_content_type, header},
+	http::{self, APPLICATION_JSON, WwwFormUrlEncoded, expect_content_type},
 	server::ErrorResponse,
 	util::extend_uri_query,
 };
@@ -24,7 +24,7 @@ impl<'a, C> AuthorizationEndpoint<'a, C>
 where
 	C: OAuth2Client,
 {
-	pub fn exchange_code(
+	pub fn authorize_url(
 		self,
 		redirect_uri: Option<UriBuf>,
 		scope: impl IntoScope,
@@ -41,7 +41,7 @@ where
 }
 
 pub trait ExchangeCode: AuthorizationEndpointLike {
-	fn exchange_code(
+	fn authorize_url(
 		self,
 		redirect_uri: Option<UriBuf>,
 		scope: impl IntoScope,
@@ -49,7 +49,7 @@ pub trait ExchangeCode: AuthorizationEndpointLike {
 }
 
 impl<T: AuthorizationEndpointLike> ExchangeCode for T {
-	fn exchange_code(
+	fn authorize_url(
 		self,
 		redirect_uri: Option<UriBuf>,
 		scope: impl IntoScope,
@@ -67,13 +67,13 @@ impl<T: AuthorizationEndpointLike> ExchangeCode for T {
 ///
 /// See: <https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.1>
 #[skip_serializing_none]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "response_type", rename = "code")]
 pub struct AuthorizationCodeAuthorizationRequest {
 	/// Client identifier.
 	///
 	/// See: <https://datatracker.ietf.org/doc/html/rfc6749#section-2.2>
-	pub client_id: String,
+	pub client_id: ClientIdBuf,
 
 	/// Redirect URI.
 	///
@@ -87,7 +87,11 @@ pub struct AuthorizationCodeAuthorizationRequest {
 }
 
 impl AuthorizationCodeAuthorizationRequest {
-	pub fn new(client_id: String, redirect_uri: Option<UriBuf>, scope: impl IntoScope) -> Self {
+	pub fn new(
+		client_id: ClientIdBuf,
+		redirect_uri: Option<UriBuf>,
+		scope: impl IntoScope,
+	) -> Self {
 		Self {
 			client_id,
 			redirect_uri,
@@ -101,8 +105,8 @@ impl AuthorizationCodeAuthorizationRequest {
 
 	pub fn grant(
 		self,
-		state: Option<String>,
-		code: String,
+		state: Option<StateBuf>,
+		code: CodeBuf,
 		default_uri: Option<&Uri>,
 	) -> Option<UriBuf> {
 		let mut url = self.redirect_url(default_uri)?.to_owned();
@@ -117,7 +121,7 @@ impl AuthorizationCodeAuthorizationRequest {
 
 	pub fn deny<T>(
 		self,
-		state: Option<String>,
+		state: Option<StateBuf>,
 		error: ErrorResponse<T>,
 		redirect_uri: Option<&Uri>,
 	) -> Option<UriBuf>
@@ -135,8 +139,13 @@ impl AuthorizationCodeAuthorizationRequest {
 impl Request for AuthorizationCodeAuthorizationRequest {}
 
 impl Redirect for AuthorizationCodeAuthorizationRequest {
-	fn build_query(&self) -> QueryBuf {
-		QueryBuf::new(serde_html_form::to_string(self).unwrap().into_bytes()).unwrap()
+	type RequestBody<'b>
+		= &'b Self
+	where
+		Self: 'b;
+
+	fn build_query(&self) -> Self::RequestBody<'_> {
+		self
 	}
 }
 
@@ -154,16 +163,40 @@ pub struct AuthorizationCodeAuthorizationResponse {
 	/// (when possible) all tokens previously issued based on that authorization
 	/// code. The authorization code is bound to the client identifier and
 	/// redirection URI.
-	pub code: String,
+	pub code: CodeBuf,
+}
+
+impl<'a, C> TokenEndpoint<'a, C>
+where
+	C: OAuth2Client,
+{
+	pub fn exchange_code(
+		self,
+		code: CodeBuf,
+		redirect_uri: Option<UriBuf>,
+	) -> TokenRequestBuilder<'a, C, AuthorizationCodeTokenRequest> {
+		let client_id = self.client.client_id().to_owned();
+		self.begin(AuthorizationCodeTokenRequest::new(
+			Some(client_id),
+			code,
+			redirect_uri,
+		))
+	}
 }
 
 /// Token Request with the Authorization Code Grant.
 #[skip_serializing_none]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "grant_type", rename = "authorization_code")]
 pub struct AuthorizationCodeTokenRequest {
+	/// Client identifier.
+	///
+	/// Required if the client is not authenticating with the authorization
+	/// server as described in Section 3.2.1.
+	pub client_id: Option<ClientIdBuf>,
+
 	/// authorization code received from the authorization server.
-	pub code: String,
+	pub code: CodeBuf,
 
 	/// Redirect URI.
 	///
@@ -171,39 +204,55 @@ pub struct AuthorizationCodeTokenRequest {
 	/// authorization request as described in Section 4.1.1, and their values
 	/// *must* be identical.
 	pub redirect_uri: Option<UriBuf>,
+}
 
-	/// Client identifier.
-	///
-	/// Required if the client is not authenticating with the authorization
-	/// server as described in Section 3.2.1.
-	pub client_id: Option<String>,
+impl AuthorizationCodeTokenRequest {
+	pub fn new(
+		client_id: Option<ClientIdBuf>,
+		code: CodeBuf,
+		redirect_uri: Option<UriBuf>,
+	) -> Self {
+		Self {
+			client_id,
+			code,
+			redirect_uri,
+		}
+	}
 }
 
 impl Request for AuthorizationCodeTokenRequest {}
 
-impl<'a, C> SendRequest<TokenEndpoint<'a, C>> for AuthorizationCodeTokenRequest {
-	type Response = TokenResponse;
-	type ResponsePayload = TokenResponse;
+impl<'a, C> SendRequest<TokenEndpoint<'a, C>> for AuthorizationCodeTokenRequest
+where
+	C: OAuth2Client,
+{
+	type ContentType = WwwFormUrlEncoded;
+	type RequestBody<'b>
+		= &'b AuthorizationCodeTokenRequest
+	where
+		Self: 'b;
+	type Response = TokenResponse<String, C::TokenParams>;
+	type ResponsePayload = TokenResponse<String, C::TokenParams>;
 
 	async fn build_request(
 		&self,
 		endpoint: &TokenEndpoint<'a, C>,
 		_http_client: &impl http::HttpClient,
-	) -> Result<http::Request<Vec<u8>>, OAuth2ClientError> {
+	) -> Result<http::Request<Self::RequestBody<'_>>, OAuth2ClientError> {
 		Ok(http::Request::builder()
+			.method(http::Method::POST)
 			.uri(endpoint.uri.as_str())
-			.header(header::CONTENT_TYPE, APPLICATION_JSON)
-			.body(serde_json::to_vec(self).unwrap())
+			.body(self)
 			.unwrap())
 	}
 
-	fn parse_response(
+	fn decode_response(
 		&self,
 		_endpoint: &TokenEndpoint<'a, C>,
 		response: http::Response<Vec<u8>>,
 	) -> Result<http::Response<Self::ResponsePayload>, OAuth2ClientError> {
 		if response.status() != http::StatusCode::OK {
-			return Err(OAuth2ClientError::ServerError(response.status()));
+			return Err(OAuth2ClientError::server(response.status()));
 		}
 
 		expect_content_type(response.headers(), &APPLICATION_JSON)?;

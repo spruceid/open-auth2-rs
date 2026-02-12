@@ -2,13 +2,12 @@
 //!
 //! See: <https://www.rfc-editor.org/rfc/rfc9396.html>
 
-use iref::uri::QueryBuf;
-use serde::{Serialize, de::DeserializeOwned};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use std::ops::{Deref, DerefMut};
 
 use crate::{
-	endpoints::{Redirect, Request, RequestBuilder},
+	endpoints::{Redirect, Request, RequestBuilder, SendRequest},
 	oauth2_extension,
-	util::concat_query,
 };
 
 /// Authorization Details Object.
@@ -21,54 +20,129 @@ pub trait AuthorizationDetailsObject: Serialize + DeserializeOwned {
 	fn r#type(&self) -> &str;
 }
 
-oauth2_extension! {
-	#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-	pub struct WithAuthorizationDetails<D: AuthorizationDetailsObject> {
-		pub authorization_details: Vec<D>,
+#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(bound = "D: AuthorizationDetailsObject")]
+pub struct AuthorizationDetails<D> {
+	#[serde(
+		rename = "authorization_details",
+		with = "as_json",
+		skip_serializing_if = "Vec::is_empty"
+	)]
+	objects: Vec<D>,
+}
+
+impl<D> From<Vec<D>> for AuthorizationDetails<D> {
+	fn from(value: Vec<D>) -> Self {
+		Self { objects: value }
 	}
 }
 
-impl<T, D> Request for WithAuthorizationDetails<D, T>
+impl<D> Deref for AuthorizationDetails<D> {
+	type Target = Vec<D>;
+
+	fn deref(&self) -> &Self::Target {
+		&self.objects
+	}
+}
+
+impl<D> DerefMut for AuthorizationDetails<D> {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		&mut self.objects
+	}
+}
+
+oauth2_extension! {
+	#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+	pub struct WithAuthorizationDetails<'a, D: AuthorizationDetailsObject> {
+		pub authorization_details: &'a [D]
+
+		=> #[serde(flatten)]
+	}
+}
+
+impl<'a, T, D> Request for WithAuthorizationDetails<'a, D, T>
 where
 	T: Request,
 	D: AuthorizationDetailsObject,
 {
 }
 
-impl<T, D> Redirect for WithAuthorizationDetails<D, T>
+impl<'a, T, D, E> SendRequest<E> for WithAuthorizationDetails<'a, D, T>
+where
+	T: SendRequest<E>,
+	D: AuthorizationDetailsObject,
+{
+	type ContentType = T::ContentType;
+	type RequestBody<'b>
+		= WithAuthorizationDetails<'a, D, T::RequestBody<'b>>
+	where
+		Self: 'b;
+	type Response = T::Response;
+	type ResponsePayload = T::ResponsePayload;
+
+	async fn build_request(
+		&self,
+		endpoint: &E,
+		http_client: &impl crate::http::HttpClient,
+	) -> Result<http::Request<Self::RequestBody<'_>>, crate::client::OAuth2ClientError> {
+		self.value
+			.build_request(endpoint, http_client)
+			.await
+			.map(|request| {
+				request
+					.map(|value| WithAuthorizationDetails::new(value, self.authorization_details))
+			})
+	}
+
+	fn decode_response(
+		&self,
+		endpoint: &E,
+		response: http::Response<Vec<u8>>,
+	) -> Result<http::Response<Self::ResponsePayload>, crate::client::OAuth2ClientError> {
+		self.value.decode_response(endpoint, response)
+	}
+
+	async fn process_response(
+		&self,
+		endpoint: &E,
+		http_client: &impl crate::http::HttpClient,
+		response: http::Response<Self::ResponsePayload>,
+	) -> Result<Self::Response, crate::client::OAuth2ClientError> {
+		self.value
+			.process_response(endpoint, http_client, response)
+			.await
+	}
+}
+
+impl<'a, T, D> Redirect for WithAuthorizationDetails<'a, D, T>
 where
 	T: Redirect,
 	D: AuthorizationDetailsObject,
 {
-	fn build_query(&self) -> QueryBuf {
-		#[derive(Serialize)]
-		struct Params<'a, D: AuthorizationDetailsObject> {
-			#[serde(skip_serializing_if = "<[_]>::is_empty", with = "as_json")]
-			authorization_details: &'a [D],
-		}
+	type RequestBody<'b>
+		= WithAuthorizationDetails<'a, D, T::RequestBody<'b>>
+	where
+		Self: 'b;
 
-		concat_query(
-			self.value.build_query(),
-			Params {
-				authorization_details: &self.authorization_details,
-			},
-		)
+	fn build_query(&self) -> Self::RequestBody<'_> {
+		WithAuthorizationDetails::new(self.value.build_query(), self.authorization_details)
 	}
 }
 
-pub trait AddAuthorizationDetails<D> {
+pub trait AddAuthorizationDetails<'a, D> {
 	type Output;
 
-	fn with_authorization_details(self, authorization_details: Vec<D>) -> Self::Output;
+	fn with_authorization_details(self, authorization_details: &'a [D]) -> Self::Output;
 }
 
-impl<'a, D, T> AddAuthorizationDetails<D> for T
+impl<'a, D, T> AddAuthorizationDetails<'a, D> for T
 where
 	T: RequestBuilder,
+	D: 'a,
 {
-	type Output = T::Mapped<WithAuthorizationDetails<D, T::Request>>;
+	type Output = T::Mapped<WithAuthorizationDetails<'a, D, T::Request>>;
 
-	fn with_authorization_details(self, authorization_details: Vec<D>) -> Self::Output {
+	fn with_authorization_details(self, authorization_details: &'a [D]) -> Self::Output {
 		self.map(|value| WithAuthorizationDetails::new(value, authorization_details))
 	}
 }

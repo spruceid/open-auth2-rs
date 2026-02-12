@@ -1,9 +1,15 @@
-use iref::{Uri, UriBuf};
+use std::collections::BTreeMap;
+
+use iref::{
+	Uri, UriBuf,
+	uri::{Query, QueryBuf},
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
 	client::OAuth2Client,
 	endpoints::{Redirect, RequestBuilder},
+	http::{ContentType, WwwFormUrlEncoded},
 };
 
 pub trait AuthorizationEndpointLike: Sized {
@@ -69,9 +75,28 @@ impl<'a, C, T> AuthorizationRequestBuilder<'a, C, T> {
 		T: Redirect,
 	{
 		let mut uri = self.endpoint.uri.to_owned();
-		let query = uri.query().map(ToOwned::to_owned).unwrap_or_default();
-		let more_query = self.request.build_query();
-		todo!()
+
+		#[derive(Serialize)]
+		struct WithAuthorizationRequest<T> {
+			#[serde(flatten)]
+			args: BTreeMap<String, String>,
+
+			#[serde(flatten)]
+			authorization_params: T,
+		}
+
+		let query = QueryBuf::new(WwwFormUrlEncoded::encode(&WithAuthorizationRequest {
+			args: serde_html_form::from_str(uri.query().map(Query::as_str).unwrap_or_default())
+				.unwrap(),
+			authorization_params: self.request.build_query(),
+		}))
+		.unwrap();
+
+		if !query.is_empty() {
+			uri.set_query(Some(&query));
+		}
+
+		uri
 	}
 }
 

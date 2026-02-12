@@ -5,6 +5,9 @@ impl HttpClient for reqwest::Client {
 		&self,
 		request: http::Request<Vec<u8>>,
 	) -> Result<http::Response<Vec<u8>>, OAuth2ClientError> {
+		log::debug!("HTTP request to: {}", request.uri());
+		log::trace!("HTTP request: {request:?}");
+
 		let response = self
 			.execute(request.try_into().map_err(OAuth2ClientError::request)?)
 			.await
@@ -21,7 +24,7 @@ impl HttpClient for reqwest::Client {
 			builder = builder.header(name, value);
 		}
 
-		builder
+		let response = builder
 			.body(
 				response
 					.bytes()
@@ -29,6 +32,10 @@ impl HttpClient for reqwest::Client {
 					.map_err(OAuth2ClientError::response)?
 					.to_vec(),
 			)
-			.map_err(OAuth2ClientError::response)
+			.map_err(OAuth2ClientError::response)?;
+
+		log::trace!("HTTP response: {response:?}");
+
+		Ok(response)
 	}
 }

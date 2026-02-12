@@ -5,18 +5,17 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::{
+	ClientIdBuf,
 	client::{OAuth2Client, OAuth2ClientError},
 	endpoints::{
 		Request, SendRequest,
-		authorization::{
-			AuthorizationEndpoint, AuthorizationEndpointLike, AuthorizationRequestBuilder,
-		},
-		token::{TokenEndpoint, TokenResponse},
+		authorization::AuthorizationEndpointLike,
+		token::{TokenEndpoint, TokenRequestBuilder, TokenResponse},
 	},
-	http::{self, expect_content_type, header},
+	http::{self, WwwFormUrlEncoded, expect_content_type},
 };
 
-impl<'a, C> AuthorizationEndpoint<'a, C>
+impl<'a, C> TokenEndpoint<'a, C>
 where
 	C: OAuth2Client,
 {
@@ -24,8 +23,8 @@ where
 		self,
 		pre_authorized_code: String,
 		tx_code: Option<String>,
-	) -> AuthorizationRequestBuilder<'a, C, PreAuthorizedCodeTokenRequest> {
-		AuthorizationRequestBuilder::new(
+	) -> TokenRequestBuilder<'a, C, PreAuthorizedCodeTokenRequest> {
+		TokenRequestBuilder::new(
 			self,
 			PreAuthorizedCodeTokenRequest::new(
 				Some(self.client.client_id().to_owned()),
@@ -69,8 +68,9 @@ impl<T: AuthorizationEndpointLike> ExchangePreAuthorizedCode for T {
 	rename = "urn:ietf:params:oauth:grant-type:pre-authorized_code"
 )]
 pub struct PreAuthorizedCodeTokenRequest {
-	pub client_id: Option<String>,
+	pub client_id: Option<ClientIdBuf>,
 
+	#[serde(rename = "pre-authorized_code")]
 	pub pre_authorized_code: String,
 
 	pub tx_code: Option<String>,
@@ -78,7 +78,7 @@ pub struct PreAuthorizedCodeTokenRequest {
 
 impl PreAuthorizedCodeTokenRequest {
 	pub fn new(
-		client_id: Option<String>,
+		client_id: Option<ClientIdBuf>,
 		pre_authorized_code: String,
 		tx_code: Option<String>,
 	) -> Self {
@@ -99,29 +99,37 @@ impl PreAuthorizedCodeTokenRequest {
 
 impl Request for PreAuthorizedCodeTokenRequest {}
 
-impl<'a, C> SendRequest<TokenEndpoint<'a, C>> for PreAuthorizedCodeTokenRequest {
-	type Response = TokenResponse;
-	type ResponsePayload = TokenResponse;
+impl<'a, C> SendRequest<TokenEndpoint<'a, C>> for PreAuthorizedCodeTokenRequest
+where
+	C: OAuth2Client,
+{
+	type ContentType = WwwFormUrlEncoded;
+	type RequestBody<'b>
+		= &'b Self
+	where
+		Self: 'b;
+	type Response = TokenResponse<String, C::TokenParams>;
+	type ResponsePayload = TokenResponse<String, C::TokenParams>;
 
 	async fn build_request(
 		&self,
 		endpoint: &TokenEndpoint<'a, C>,
 		_http_client: &impl http::HttpClient,
-	) -> Result<http::Request<Vec<u8>>, OAuth2ClientError> {
+	) -> Result<http::Request<Self::RequestBody<'_>>, OAuth2ClientError> {
 		Ok(http::Request::builder()
+			.method(http::Method::POST)
 			.uri(endpoint.uri.as_str())
-			.header(header::CONTENT_TYPE, http::APPLICATION_JSON)
-			.body(serde_json::to_vec(self).unwrap())
+			.body(self)
 			.unwrap())
 	}
 
-	fn parse_response(
+	fn decode_response(
 		&self,
 		_endpoint: &TokenEndpoint<'a, C>,
 		response: http::Response<Vec<u8>>,
 	) -> Result<http::Response<Self::ResponsePayload>, OAuth2ClientError> {
 		if response.status() != http::StatusCode::OK {
-			return Err(OAuth2ClientError::ServerError(response.status()));
+			return Err(OAuth2ClientError::server(response.status()));
 		}
 
 		expect_content_type(response.headers(), &http::APPLICATION_JSON)?;

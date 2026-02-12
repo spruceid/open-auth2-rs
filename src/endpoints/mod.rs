@@ -1,23 +1,39 @@
-use iref::uri::QueryBuf;
+use http::header::CONTENT_TYPE;
 use serde::{Deserialize, Serialize};
-use serde_with::skip_serializing_none;
 
-use crate::{client::OAuth2ClientError, http::HttpClient, util::concat_query};
+use crate::{
+	client::OAuth2ClientError,
+	http::{ContentType, HttpClient},
+};
 
 pub mod authorization;
 pub mod pushed_authorization;
 pub mod token;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct NoExtension {}
 
 pub trait Redirect {
-	fn build_query(&self) -> QueryBuf;
+	type RequestBody<'b>: Serialize
+	where
+		Self: 'b;
+
+	fn build_query(&self) -> Self::RequestBody<'_>;
 }
 
 pub trait Request {}
 
+pub trait Endpoint {
+	type Client;
+
+	fn client(&self) -> &Self::Client;
+}
+
 pub trait SendRequest<E>: Sized {
+	type ContentType: ContentType;
+	type RequestBody<'b>: Serialize
+	where
+		Self: 'b;
 	type ResponsePayload;
 	type Response;
 
@@ -26,9 +42,9 @@ pub trait SendRequest<E>: Sized {
 		&self,
 		endpoint: &E,
 		http_client: &impl HttpClient,
-	) -> Result<http::Request<Vec<u8>>, OAuth2ClientError>;
+	) -> Result<http::Request<Self::RequestBody<'_>>, OAuth2ClientError>;
 
-	fn parse_response(
+	fn decode_response(
 		&self,
 		endpoint: &E,
 		response: http::Response<Vec<u8>>,
@@ -48,10 +64,14 @@ pub trait SendRequest<E>: Sized {
 		endpoint: &E,
 		http_client: &impl HttpClient,
 	) -> Result<Self::Response, OAuth2ClientError> {
-		let request = self.build_request(endpoint, http_client).await?;
-		let response = http_client.send(request).await?;
-		let parsed_response = self.parse_response(endpoint, response)?;
-		self.process_response(endpoint, http_client, parsed_response)
+		let mut request = self.build_request(endpoint, http_client).await?;
+		if let Some(content_type) = Self::ContentType::VALUE {
+			request.headers_mut().insert(CONTENT_TYPE, content_type);
+		}
+		let encoded_request = request.map(|body| Self::ContentType::encode(&body));
+		let response = http_client.send(encoded_request).await?;
+		let decoded_response = self.decode_response(endpoint, response)?;
+		self.process_response(endpoint, http_client, decoded_response)
 			.await
 	}
 }
@@ -62,66 +82,4 @@ pub trait RequestBuilder {
 	type Mapped<U>;
 
 	fn map<U>(self, f: impl FnOnce(Self::Request) -> U) -> Self::Mapped<U>;
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct Stateful<T> {
-	/// Opaque value used by the client to maintain state between the request
-	/// and callback.
-	///
-	/// The authorization server includes this value when redirecting the
-	/// user-agent back to the client. The parameter *should* be used for
-	/// preventing cross-site request forgery.
-	///
-	/// See: <https://datatracker.ietf.org/doc/html/rfc6749#section-10.12>
-	pub state: Option<String>,
-
-	#[serde(flatten)]
-	pub value: T,
-}
-
-impl<T> Stateful<T> {
-	pub fn new(value: T, state: Option<String>) -> Self {
-		Self { state, value }
-	}
-}
-
-impl<T> Request for Stateful<T> where T: Request {}
-
-impl<T> Redirect for Stateful<T>
-where
-	T: Redirect,
-{
-	fn build_query(&self) -> QueryBuf {
-		#[skip_serializing_none]
-		#[derive(Serialize)]
-		struct Params<'a> {
-			state: Option<&'a str>,
-		}
-
-		concat_query(
-			self.value.build_query(),
-			Params {
-				state: self.state.as_deref(),
-			},
-		)
-	}
-}
-
-pub trait AddState {
-	type Output;
-
-	fn with_state(self, state: Option<String>) -> Self::Output;
-}
-
-impl<T> AddState for T
-where
-	T: RequestBuilder,
-{
-	type Output = T::Mapped<Stateful<T::Request>>;
-
-	fn with_state(self, state: Option<String>) -> Self::Output {
-		self.map(|value| Stateful::new(value, state))
-	}
 }

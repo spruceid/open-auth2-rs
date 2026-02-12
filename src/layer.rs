@@ -19,20 +19,22 @@
 macro_rules! oauth2_extension {
 	{
 	    $(#[$ty_meta:meta])*
-	    $ty_vis:vis struct $outer:ident $(<$($param:tt $(: $param_bound:tt)?),*>)? { $(#[$field_meta:meta])* pub $field:ident : $inner:ty $(, $(#[$value_meta:meta])*)? }
+	    $ty_vis:vis struct $outer:ident $(<$($param:tt $(: $param_bound:tt)?),*>)? { $($(#[$field_meta:meta])* pub $field:ident : $inner:ty),* $( => $(#[$value_meta:meta])*)? }
 	} => {
 	    $(#[$ty_meta])*
 		$ty_vis struct $outer<$($($param,)*)? T> {
-		    $(#[$field_meta])*
+		    $(
+						$(#[$field_meta])*
 			pub $field: $inner,
+						)*
 
 			$($(#[$value_meta])*)?
 			pub value: T,
 		}
 
 		impl<$($($param,)*)? T> $outer<$($($param,)*)? T> {
-			pub fn new(value: T, $field: $inner) -> Self {
-				Self { value, $field }
+			pub fn new(value: T, $($field: $inner),*) -> Self {
+				Self { value, $($field),* }
 			}
 		}
 

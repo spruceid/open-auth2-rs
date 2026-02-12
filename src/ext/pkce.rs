@@ -10,15 +10,17 @@ use sha2::{Digest, Sha256};
 use str_newtype::StrNewType;
 
 use crate::{
-	endpoints::{Redirect, Request, RequestBuilder},
+	endpoints::{Redirect, Request, RequestBuilder, SendRequest},
 	oauth2_extension,
-	util::concat_query,
 };
 
 oauth2_extension! {
-	#[derive(Debug, Clone, PartialEq, Eq)]
+	#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 	pub struct WithPkceChallenge {
+		#[serde(flatten)]
 		pub pkce: PkceCodeChallengeAndMethod
+
+		=> #[serde(flatten)]
 	}
 }
 
@@ -28,8 +30,13 @@ impl<T> Redirect for WithPkceChallenge<T>
 where
 	T: Redirect,
 {
-	fn build_query(&self) -> iref::uri::QueryBuf {
-		concat_query(self.value.build_query(), &self.pkce)
+	type RequestBody<'b>
+		= WithPkceChallenge<T::RequestBody<'b>>
+	where
+		Self: 'b;
+
+	fn build_query(&self) -> Self::RequestBody<'_> {
+		WithPkceChallenge::new(self.value.build_query(), self.pkce.clone())
 	}
 }
 
@@ -47,6 +54,92 @@ where
 
 	fn with_pkce_challenge(self, pkce: PkceCodeChallengeAndMethod) -> Self::Output {
 		self.map(|value| WithPkceChallenge::new(value, pkce))
+	}
+}
+
+oauth2_extension! {
+	#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+	pub struct WithPkceVerifier<'a> {
+		pub pkce_verifier: &'a PkceCodeVerifier
+
+		=> #[serde(flatten)]
+	}
+}
+
+impl<'a, T> Request for WithPkceVerifier<'a, T> where T: Request {}
+
+impl<'a, T, E> SendRequest<E> for WithPkceVerifier<'a, T>
+where
+	T: SendRequest<E>,
+{
+	type ContentType = T::ContentType;
+	type RequestBody<'b>
+		= WithPkceVerifier<'a, T::RequestBody<'b>>
+	where
+		Self: 'b;
+	type Response = T::Response;
+	type ResponsePayload = T::ResponsePayload;
+
+	async fn build_request<'b>(
+		&'b self,
+		endpoint: &E,
+		http_client: &impl crate::http::HttpClient,
+	) -> Result<http::Request<Self::RequestBody<'b>>, crate::client::OAuth2ClientError> {
+		Ok(self
+			.value
+			.build_request(endpoint, http_client)
+			.await?
+			.map(|value| WithPkceVerifier::new(value, self.pkce_verifier)))
+	}
+
+	fn decode_response(
+		&self,
+		endpoint: &E,
+		response: http::Response<Vec<u8>>,
+	) -> Result<http::Response<Self::ResponsePayload>, crate::client::OAuth2ClientError> {
+		self.value.decode_response(endpoint, response)
+	}
+
+	async fn process_response(
+		&self,
+		endpoint: &E,
+		http_client: &impl crate::http::HttpClient,
+		response: http::Response<Self::ResponsePayload>,
+	) -> Result<Self::Response, crate::client::OAuth2ClientError> {
+		self.value
+			.process_response(endpoint, http_client, response)
+			.await
+	}
+}
+
+impl<'a, T> Redirect for WithPkceVerifier<'a, T>
+where
+	T: Redirect,
+{
+	type RequestBody<'b>
+		= WithPkceVerifier<'a, T::RequestBody<'b>>
+	where
+		Self: 'b;
+
+	fn build_query(&self) -> Self::RequestBody<'_> {
+		WithPkceVerifier::new(self.value.build_query(), self.pkce_verifier)
+	}
+}
+
+pub trait AddPkceVerifier<'a> {
+	type Output;
+
+	fn with_pkce_verifier(self, pkce_verifier: &'a PkceCodeVerifier) -> Self::Output;
+}
+
+impl<'a, T> AddPkceVerifier<'a> for T
+where
+	T: RequestBuilder,
+{
+	type Output = T::Mapped<WithPkceVerifier<'a, T::Request>>;
+
+	fn with_pkce_verifier(self, pkce_verifier: &'a PkceCodeVerifier) -> Self::Output {
+		self.map(|value| WithPkceVerifier::new(value, pkce_verifier))
 	}
 }
 

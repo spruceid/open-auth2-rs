@@ -1102,6 +1102,7 @@ dependencies = [
  "base64",
  "http",
  "iref",
+ "log",
  "rand 0.10.0",
  "reqwest",
  "serde",
