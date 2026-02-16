@@ -6,9 +6,8 @@ use serde_with::skip_serializing_none;
 
 use crate::{
 	AccessTokenBuf, ScopeBuf,
-	client::OAuth2ClientError,
-	endpoints::{Endpoint, NoExtension, RequestBuilder, SendRequest},
-	http::HttpClient,
+	client::OAuth2Client,
+	endpoints::{Endpoint, NoExtension},
 };
 
 pub struct TokenEndpoint<'a, C> {
@@ -29,12 +28,15 @@ impl<'a, C> TokenEndpoint<'a, C> {
 		Self { client, uri }
 	}
 
-	pub fn begin<T>(self, request: T) -> TokenRequestBuilder<'a, C, T> {
-		TokenRequestBuilder::new(self, request)
-	}
+	// pub fn begin<T>(self, request: T) -> TokenRequestBuilder<'a, C, T> {
+	// 	TokenRequestBuilder::new(self, request)
+	// }
 }
 
-impl<'a, C> Endpoint for TokenEndpoint<'a, C> {
+impl<'a, C> Endpoint for TokenEndpoint<'a, C>
+where
+	C: OAuth2Client,
+{
 	type Client = C;
 
 	fn client(&self) -> &Self::Client {
@@ -42,39 +44,39 @@ impl<'a, C> Endpoint for TokenEndpoint<'a, C> {
 	}
 }
 
-pub struct TokenRequestBuilder<'a, C, T> {
-	pub endpoint: TokenEndpoint<'a, C>,
-	pub request: T,
-}
+// pub struct TokenRequestBuilder<'a, C, T> {
+// 	pub endpoint: TokenEndpoint<'a, C>,
+// 	pub request: T,
+// }
 
-impl<'a, C, T> TokenRequestBuilder<'a, C, T> {
-	pub fn new(endpoint: TokenEndpoint<'a, C>, request: T) -> Self {
-		Self { endpoint, request }
-	}
+// impl<'a, C, T> TokenRequestBuilder<'a, C, T> {
+// 	pub fn new(endpoint: TokenEndpoint<'a, C>, request: T) -> Self {
+// 		Self { endpoint, request }
+// 	}
 
-	pub fn map<U>(self, f: impl FnOnce(T) -> U) -> TokenRequestBuilder<'a, C, U> {
-		TokenRequestBuilder {
-			endpoint: self.endpoint,
-			request: f(self.request),
-		}
-	}
+// 	pub fn map<U>(self, f: impl FnOnce(T) -> U) -> TokenRequestBuilder<'a, C, U> {
+// 		TokenRequestBuilder {
+// 			endpoint: self.endpoint,
+// 			request: f(self.request),
+// 		}
+// 	}
 
-	pub async fn send(self, http_client: &impl HttpClient) -> Result<T::Response, OAuth2ClientError>
-	where
-		T: SendRequest<TokenEndpoint<'a, C>>,
-	{
-		self.request.send(&self.endpoint, http_client).await
-	}
-}
+// 	pub async fn send(self, http_client: &impl HttpClient) -> Result<T::Response, OAuth2ClientError>
+// 	where
+// 		T: SendRequest<TokenEndpoint<'a, C>>,
+// 	{
+// 		self.request.send(&self.endpoint, http_client).await
+// 	}
+// }
 
-impl<'a, C, T> RequestBuilder for TokenRequestBuilder<'a, C, T> {
-	type Request = T;
-	type Mapped<U> = TokenRequestBuilder<'a, C, U>;
+// impl<'a, C, T> RequestBuilder for TokenRequestBuilder<'a, C, T> {
+// 	type Request = T;
+// 	type Mapped<U> = TokenRequestBuilder<'a, C, U>;
 
-	fn map<U>(self, f: impl FnOnce(Self::Request) -> U) -> Self::Mapped<U> {
-		self.map(f)
-	}
-}
+// 	fn map<U>(self, f: impl FnOnce(Self::Request) -> U) -> Self::Mapped<U> {
+// 		self.map(f)
+// 	}
+// }
 
 pub trait TokenType: Serialize + DeserializeOwned + Display {}
 

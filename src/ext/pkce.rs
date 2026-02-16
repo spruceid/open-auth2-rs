@@ -38,17 +38,57 @@ where
 	}
 }
 
+impl<E, T> SendRequest<E> for WithPkceChallenge<T>
+where
+	T: SendRequest<E>,
+{
+	type ContentType = T::ContentType;
+	type RequestBody<'b>
+		= WithPkceChallenge<T::RequestBody<'b>>
+	where
+		Self: 'b;
+	type Response = T::Response;
+	type ResponsePayload = T::ResponsePayload;
+
+	async fn build_request(
+		&self,
+		endpoint: &E,
+		http_client: &impl crate::http::HttpClient,
+	) -> Result<http::Request<Self::RequestBody<'_>>, crate::client::OAuth2ClientError> {
+		self.value
+			.build_request(endpoint, http_client)
+			.await
+			.map(|request| request.map(|value| WithPkceChallenge::new(value, self.pkce.clone())))
+	}
+
+	fn decode_response(
+		&self,
+		endpoint: &E,
+		response: http::Response<Vec<u8>>,
+	) -> Result<http::Response<Self::ResponsePayload>, crate::client::OAuth2ClientError> {
+		self.value.decode_response(endpoint, response)
+	}
+
+	async fn process_response(
+		&self,
+		endpoint: &E,
+		http_client: &impl crate::http::HttpClient,
+		response: http::Response<Self::ResponsePayload>,
+	) -> Result<Self::Response, crate::client::OAuth2ClientError> {
+		self.value
+			.process_response(endpoint, http_client, response)
+			.await
+	}
+}
+
 pub trait AddPkceChallenge {
 	type Output;
 
 	fn with_pkce_challenge(self, pkce: PkceCodeChallengeAndMethod) -> Self::Output;
 }
 
-impl<T> AddPkceChallenge for T
-where
-	T: RequestBuilder,
-{
-	type Output = T::Mapped<WithPkceChallenge<T::Request>>;
+impl<E, T> AddPkceChallenge for RequestBuilder<E, T> {
+	type Output = RequestBuilder<E, WithPkceChallenge<T>>;
 
 	fn with_pkce_challenge(self, pkce: PkceCodeChallengeAndMethod) -> Self::Output {
 		self.map(|value| WithPkceChallenge::new(value, pkce))
@@ -128,11 +168,8 @@ pub trait AddPkceVerifier<'a> {
 	fn with_pkce_verifier(self, pkce_verifier: &'a PkceCodeVerifier) -> Self::Output;
 }
 
-impl<'a, T> AddPkceVerifier<'a> for T
-where
-	T: RequestBuilder,
-{
-	type Output = T::Mapped<WithPkceVerifier<'a, T::Request>>;
+impl<'a, E, T> AddPkceVerifier<'a> for RequestBuilder<E, T> {
+	type Output = RequestBuilder<E, WithPkceVerifier<'a, T>>;
 
 	fn with_pkce_verifier(self, pkce_verifier: &'a PkceCodeVerifier) -> Self::Output {
 		self.map(|value| WithPkceVerifier::new(value, pkce_verifier))

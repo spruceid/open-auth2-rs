@@ -103,12 +103,11 @@ pub trait AddAccessToken<'a, Ty> {
 	fn with_access_token(self, token_type: &'a Ty, access_token: &'a AccessToken) -> Self::Output;
 }
 
-impl<'a, Ty, T> AddAccessToken<'a, Ty> for T
+impl<'a, Ty, E, T> AddAccessToken<'a, Ty> for RequestBuilder<E, T>
 where
-	T: RequestBuilder,
 	Ty: 'a,
 {
-	type Output = T::Mapped<WithAccessToken<'a, Ty, T::Request>>;
+	type Output = RequestBuilder<E, WithAccessToken<'a, Ty, T>>;
 
 	fn with_access_token(self, token_type: &'a Ty, access_token: &'a AccessToken) -> Self::Output {
 		self.map(|value| WithAccessToken::new(value, token_type, access_token))

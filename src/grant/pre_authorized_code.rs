@@ -8,9 +8,9 @@ use crate::{
 	ClientIdBuf,
 	client::{OAuth2Client, OAuth2ClientError},
 	endpoints::{
-		SendRequest,
-		authorization::AuthorizationEndpointLike,
-		token::{TokenEndpoint, TokenRequestBuilder, TokenResponse},
+		RequestBuilder, SendRequest,
+		authorization::AnyAuthorizationEndpoint,
+		token::{TokenEndpoint, TokenResponse},
 	},
 	http::{self, WwwFormUrlEncoded, expect_content_type},
 };
@@ -23,8 +23,8 @@ where
 		self,
 		pre_authorized_code: String,
 		tx_code: Option<String>,
-	) -> TokenRequestBuilder<'a, C, PreAuthorizedCodeTokenRequest> {
-		TokenRequestBuilder::new(
+	) -> RequestBuilder<Self, PreAuthorizedCodeTokenRequest> {
+		RequestBuilder::new(
 			self,
 			PreAuthorizedCodeTokenRequest::new(
 				Some(self.client.client_id().to_owned()),
@@ -35,26 +35,28 @@ where
 	}
 }
 
-pub trait ExchangePreAuthorizedCode: AuthorizationEndpointLike {
+pub trait ExchangePreAuthorizedCode: Sized + AnyAuthorizationEndpoint {
 	fn exchange_pre_authorized_code(
 		self,
 		pre_authorized_code: String,
 		tx_code: Option<String>,
-	) -> Self::RequestBuilder<PreAuthorizedCodeTokenRequest>;
+	) -> RequestBuilder<Self, PreAuthorizedCodeTokenRequest>;
 }
 
-impl<T: AuthorizationEndpointLike> ExchangePreAuthorizedCode for T {
+impl<T> ExchangePreAuthorizedCode for T
+where
+	T: AnyAuthorizationEndpoint,
+{
 	fn exchange_pre_authorized_code(
 		self,
 		pre_authorized_code: String,
 		tx_code: Option<String>,
-	) -> Self::RequestBuilder<PreAuthorizedCodeTokenRequest> {
+	) -> RequestBuilder<Self, PreAuthorizedCodeTokenRequest> {
 		let client_id = self.client().client_id().to_owned();
-		self.build_request(PreAuthorizedCodeTokenRequest::new(
-			Some(client_id),
-			pre_authorized_code,
-			tx_code,
-		))
+		RequestBuilder::new(
+			self,
+			PreAuthorizedCodeTokenRequest::new(Some(client_id), pre_authorized_code, tx_code),
+		)
 	}
 }
 

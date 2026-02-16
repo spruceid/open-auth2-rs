@@ -115,6 +115,35 @@ impl Scope {
 
 		true
 	}
+
+	pub fn contains(&self, token: &ScopeToken) -> bool {
+		self.iter().any(|t| t == token)
+	}
+
+	pub fn iter(&self) -> ScopeIter<'_> {
+		ScopeIter(self.0.split(' '))
+	}
+}
+
+impl<'a> IntoIterator for &'a Scope {
+	type IntoIter = ScopeIter<'a>;
+	type Item = &'a ScopeToken;
+
+	fn into_iter(self) -> Self::IntoIter {
+		self.iter()
+	}
+}
+
+pub struct ScopeIter<'a>(std::str::Split<'a, char>);
+
+impl<'a> Iterator for ScopeIter<'a> {
+	type Item = &'a ScopeToken;
+
+	fn next(&mut self) -> Option<Self::Item> {
+		self.0
+			.next()
+			.map(|t| unsafe { ScopeToken::new_unchecked(t) })
+	}
 }
 
 impl ScopeBuf {
@@ -137,5 +166,32 @@ impl ScopeBuf {
 		} else {
 			Some(Self(result))
 		}
+	}
+
+	pub fn insert(&mut self, token: &ScopeToken) -> bool {
+		if self.contains(token) {
+			false
+		} else {
+			self.0.push(' ');
+			self.0.push_str(token.as_str());
+			true
+		}
+	}
+}
+
+impl<'a> Extend<&'a ScopeToken> for ScopeBuf {
+	fn extend<T: IntoIterator<Item = &'a ScopeToken>>(&mut self, iter: T) {
+		for t in iter {
+			self.insert(t);
+		}
+	}
+}
+
+impl<'a> IntoIterator for &'a ScopeBuf {
+	type IntoIter = ScopeIter<'a>;
+	type Item = &'a ScopeToken;
+
+	fn into_iter(self) -> Self::IntoIter {
+		self.iter()
 	}
 }

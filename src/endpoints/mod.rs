@@ -2,7 +2,7 @@ use http::header::CONTENT_TYPE;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-	client::OAuth2ClientError,
+	client::{OAuth2Client, OAuth2ClientError},
 	http::{ContentType, HttpClient},
 };
 
@@ -14,7 +14,7 @@ pub mod token;
 pub struct NoExtension {}
 
 pub trait Endpoint {
-	type Client;
+	type Client: OAuth2Client;
 
 	fn client(&self) -> &Self::Client;
 }
@@ -74,10 +74,25 @@ pub trait SendRequest<E>: Sized {
 	}
 }
 
-pub trait RequestBuilder {
-	type Request;
+pub struct RequestBuilder<E, T> {
+	pub endpoint: E,
+	pub request: T,
+}
 
-	type Mapped<U>;
+impl<E, T> RequestBuilder<E, T> {
+	pub fn new(endpoint: E, request: T) -> Self {
+		Self { endpoint, request }
+	}
 
-	fn map<U>(self, f: impl FnOnce(Self::Request) -> U) -> Self::Mapped<U>;
+	pub fn map<U>(self, f: impl FnOnce(T) -> U) -> RequestBuilder<E, U> {
+		RequestBuilder::new(self.endpoint, f(self.request))
+	}
+
+	pub async fn send(self, http_client: &impl HttpClient) -> Result<T::Response, OAuth2ClientError>
+	where
+		T: SendRequest<E>,
+	{
+		let endpoint = self.endpoint;
+		self.request.send(&endpoint, http_client).await
+	}
 }

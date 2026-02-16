@@ -9,11 +9,9 @@ use crate::{
 	ClientIdBuf, CodeBuf, IntoScope, ScopeBuf, StateBuf, Stateful,
 	client::{OAuth2Client, OAuth2ClientError},
 	endpoints::{
-		Redirect, SendRequest,
-		authorization::{
-			AuthorizationEndpoint, AuthorizationEndpointLike, AuthorizationRequestBuilder,
-		},
-		token::{TokenEndpoint, TokenRequestBuilder, TokenResponse},
+		Redirect, RequestBuilder, SendRequest,
+		authorization::{AnyAuthorizationEndpoint, AuthorizationEndpoint},
+		token::{TokenEndpoint, TokenResponse},
 	},
 	http::{self, APPLICATION_JSON, WwwFormUrlEncoded, expect_content_type},
 	server::ErrorResponse,
@@ -28,8 +26,8 @@ where
 		self,
 		redirect_uri: Option<UriBuf>,
 		scope: impl IntoScope,
-	) -> AuthorizationRequestBuilder<'a, C, AuthorizationCodeAuthorizationRequest> {
-		AuthorizationRequestBuilder::new(
+	) -> RequestBuilder<Self, AuthorizationCodeAuthorizationRequest> {
+		RequestBuilder::new(
 			self,
 			AuthorizationCodeAuthorizationRequest::new(
 				self.client.client_id().to_owned(),
@@ -40,26 +38,32 @@ where
 	}
 }
 
-pub trait ExchangeCode: AuthorizationEndpointLike {
+pub trait ExchangeCode: Sized + AnyAuthorizationEndpoint {
 	fn authorize_url(
 		self,
 		redirect_uri: Option<UriBuf>,
 		scope: impl IntoScope,
-	) -> Self::RequestBuilder<AuthorizationCodeAuthorizationRequest>;
+	) -> RequestBuilder<Self, Self::Request<AuthorizationCodeAuthorizationRequest>>;
 }
 
-impl<T: AuthorizationEndpointLike> ExchangeCode for T {
+impl<T> ExchangeCode for T
+where
+	T: AnyAuthorizationEndpoint,
+{
 	fn authorize_url(
 		self,
 		redirect_uri: Option<UriBuf>,
 		scope: impl IntoScope,
-	) -> Self::RequestBuilder<AuthorizationCodeAuthorizationRequest> {
+	) -> RequestBuilder<Self, Self::Request<AuthorizationCodeAuthorizationRequest>> {
 		let client_id = self.client().client_id().to_owned();
-		self.build_request(AuthorizationCodeAuthorizationRequest::new(
-			client_id,
-			redirect_uri,
-			scope,
-		))
+		RequestBuilder::new(
+			self,
+			Self::build_authorization_request(AuthorizationCodeAuthorizationRequest::new(
+				client_id,
+				redirect_uri,
+				scope,
+			)),
+		)
 	}
 }
 
@@ -172,13 +176,12 @@ where
 		self,
 		code: CodeBuf,
 		redirect_uri: Option<UriBuf>,
-	) -> TokenRequestBuilder<'a, C, AuthorizationCodeTokenRequest> {
+	) -> RequestBuilder<Self, AuthorizationCodeTokenRequest> {
 		let client_id = self.client.client_id().to_owned();
-		self.begin(AuthorizationCodeTokenRequest::new(
-			Some(client_id),
-			code,
-			redirect_uri,
-		))
+		RequestBuilder::new(
+			self,
+			AuthorizationCodeTokenRequest::new(Some(client_id), code, redirect_uri),
+		)
 	}
 }
 

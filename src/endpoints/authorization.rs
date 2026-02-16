@@ -8,18 +8,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
 	client::OAuth2Client,
-	endpoints::{Redirect, RequestBuilder},
+	endpoints::{Endpoint, Redirect, RequestBuilder},
 	http::{ContentType, WwwFormUrlEncoded},
 };
-
-pub trait AuthorizationEndpointLike: Sized {
-	type Client: OAuth2Client;
-	type RequestBuilder<T>: RequestBuilder<Request = T>;
-
-	fn client(&self) -> &Self::Client;
-
-	fn build_request<T>(self, request: T) -> Self::RequestBuilder<T>;
-}
 
 pub struct AuthorizationEndpoint<'a, C> {
 	pub client: &'a C,
@@ -40,36 +31,48 @@ impl<'a, C> Clone for AuthorizationEndpoint<'a, C> {
 
 impl<'a, C> Copy for AuthorizationEndpoint<'a, C> {}
 
-impl<'a, C: OAuth2Client> AuthorizationEndpointLike for AuthorizationEndpoint<'a, C> {
+impl<'a, C> Endpoint for AuthorizationEndpoint<'a, C>
+where
+	C: OAuth2Client,
+{
 	type Client = C;
-	type RequestBuilder<T> = AuthorizationRequestBuilder<'a, C, T>;
 
 	fn client(&self) -> &Self::Client {
 		self.client
 	}
+}
 
-	fn build_request<T>(self, request: T) -> Self::RequestBuilder<T> {
-		AuthorizationRequestBuilder::new(self, request)
+pub trait AnyAuthorizationEndpoint: Endpoint {
+	type Request<T>;
+
+	fn build_authorization_request<T>(request: T) -> Self::Request<T>;
+}
+
+impl<'a, C> AnyAuthorizationEndpoint for AuthorizationEndpoint<'a, C>
+where
+	C: OAuth2Client,
+{
+	type Request<T> = T;
+
+	fn build_authorization_request<T>(request: T) -> Self::Request<T> {
+		request
 	}
 }
 
-pub struct AuthorizationRequestBuilder<'a, C, T> {
-	pub endpoint: AuthorizationEndpoint<'a, C>,
-	pub request: T,
-}
+// impl<'a, C: OAuth2Client> AuthorizationEndpointLike for AuthorizationEndpoint<'a, C> {
+// 	type Client = C;
+// 	type RequestBuilder<T> = AuthorizationRequestBuilder<'a, C, T>;
 
-impl<'a, C, T> AuthorizationRequestBuilder<'a, C, T> {
-	pub fn new(endpoint: AuthorizationEndpoint<'a, C>, request: T) -> Self {
-		Self { endpoint, request }
-	}
+// 	fn client(&self) -> &Self::Client {
+// 		self.client
+// 	}
 
-	pub fn map<U>(self, f: impl FnOnce(T) -> U) -> AuthorizationRequestBuilder<'a, C, U> {
-		AuthorizationRequestBuilder {
-			endpoint: self.endpoint,
-			request: f(self.request),
-		}
-	}
+// 	fn build_request<T>(self, request: T) -> Self::RequestBuilder<T> {
+// 		AuthorizationRequestBuilder::new(self, request)
+// 	}
+// }
 
+impl<'a, C, T> RequestBuilder<AuthorizationEndpoint<'a, C>, T> {
 	pub fn into_uri(self) -> UriBuf
 	where
 		T: Redirect,
@@ -99,23 +102,6 @@ impl<'a, C, T> AuthorizationRequestBuilder<'a, C, T> {
 		uri
 	}
 }
-
-impl<'a, C, T> RequestBuilder for AuthorizationRequestBuilder<'a, C, T> {
-	type Request = T;
-	type Mapped<U> = AuthorizationRequestBuilder<'a, C, U>;
-
-	fn map<U>(self, f: impl FnOnce(Self::Request) -> U) -> Self::Mapped<U> {
-		self.map(f)
-	}
-}
-
-// pub trait AuthorizationRequest: Serialize {
-// 	fn redirect_url(&self, endpoint_uri: &Uri) -> UriBuf {
-// 		let mut url = endpoint_uri.to_owned();
-// 		extend_uri_query(&mut url, self);
-// 		url
-// 	}
-// }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

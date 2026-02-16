@@ -14,8 +14,8 @@ use crate::{
 	ClientIdBuf,
 	client::{OAuth2Client, OAuth2ClientError},
 	endpoints::{
-		Redirect, RequestBuilder, SendRequest,
-		authorization::{AuthorizationEndpoint, AuthorizationEndpointLike},
+		Endpoint, Redirect, SendRequest,
+		authorization::{AnyAuthorizationEndpoint, AuthorizationEndpoint},
 	},
 	http::{APPLICATION_JSON, HttpClient, WwwFormUrlEncoded, expect_content_type},
 };
@@ -39,63 +39,25 @@ impl<'a, C> Clone for PushedAuthorizationEndpoint<'a, C> {
 
 impl<'a, C> Copy for PushedAuthorizationEndpoint<'a, C> {}
 
-impl<'a, C: OAuth2Client> AuthorizationEndpointLike for PushedAuthorizationEndpoint<'a, C> {
+impl<'a, C> Endpoint for PushedAuthorizationEndpoint<'a, C>
+where
+	C: OAuth2Client,
+{
 	type Client = C;
-	type RequestBuilder<T> = PushedAuthorizationRequestBuilder<'a, C, T>;
 
 	fn client(&self) -> &Self::Client {
 		self.client
 	}
-
-	fn build_request<T>(self, request: T) -> Self::RequestBuilder<T> {
-		PushedAuthorizationRequestBuilder::new(self, request)
-	}
 }
 
-pub struct PushedAuthorizationRequestBuilder<'a, C, T> {
-	endpoint: PushedAuthorizationEndpoint<'a, C>,
-	request: T,
-}
-
-impl<'a, C, T> PushedAuthorizationRequestBuilder<'a, C, T> {
-	pub fn new(endpoint: PushedAuthorizationEndpoint<'a, C>, value: T) -> Self {
-		Self {
-			endpoint,
-			request: value,
-		}
-	}
-
-	pub fn map<U>(self, f: impl FnOnce(T) -> U) -> PushedAuthorizationRequestBuilder<'a, C, U> {
-		PushedAuthorizationRequestBuilder {
-			endpoint: self.endpoint,
-			request: f(self.request),
-		}
-	}
-
-	pub fn build(self) -> Pushed<T> {
-		Pushed(self.request)
-	}
-}
-
-impl<'a, C, T> PushedAuthorizationRequestBuilder<'a, C, T>
+impl<'a, C> AnyAuthorizationEndpoint for PushedAuthorizationEndpoint<'a, C>
 where
-	T: Redirect,
+	C: OAuth2Client,
 {
-	pub async fn send(
-		self,
-		http_client: &impl HttpClient,
-	) -> Result<PushedAuthorizationResponse, OAuth2ClientError> {
-		let endpoint = self.endpoint;
-		self.build().send(&endpoint, http_client).await
-	}
-}
+	type Request<T> = Pushed<T>;
 
-impl<'a, C, T> RequestBuilder for PushedAuthorizationRequestBuilder<'a, C, T> {
-	type Request = T;
-	type Mapped<U> = PushedAuthorizationRequestBuilder<'a, C, U>;
-
-	fn map<U>(self, f: impl FnOnce(Self::Request) -> U) -> Self::Mapped<U> {
-		self.map(f)
+	fn build_authorization_request<T>(request: T) -> Self::Request<T> {
+		Pushed(request)
 	}
 }
 

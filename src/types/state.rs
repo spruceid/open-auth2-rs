@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use str_newtype::StrNewType;
 
-use crate::endpoints::{Redirect, RequestBuilder};
+use crate::endpoints::{Redirect, RequestBuilder, SendRequest};
 
 use super::is_vschar;
 
@@ -106,17 +106,57 @@ where
 	}
 }
 
+impl<E, T> SendRequest<E> for Stateful<T>
+where
+	T: SendRequest<E>,
+{
+	type ContentType = T::ContentType;
+	type RequestBody<'b>
+		= Stateful<T::RequestBody<'b>>
+	where
+		Self: 'b;
+	type Response = T::Response;
+	type ResponsePayload = T::ResponsePayload;
+
+	async fn build_request(
+		&self,
+		endpoint: &E,
+		http_client: &impl crate::http::HttpClient,
+	) -> Result<http::Request<Self::RequestBody<'_>>, crate::client::OAuth2ClientError> {
+		self.value
+			.build_request(endpoint, http_client)
+			.await
+			.map(|request| request.map(|value| Stateful::new(value, self.state.clone())))
+	}
+
+	fn decode_response(
+		&self,
+		endpoint: &E,
+		response: http::Response<Vec<u8>>,
+	) -> Result<http::Response<Self::ResponsePayload>, crate::client::OAuth2ClientError> {
+		self.value.decode_response(endpoint, response)
+	}
+
+	async fn process_response(
+		&self,
+		endpoint: &E,
+		http_client: &impl crate::http::HttpClient,
+		response: http::Response<Self::ResponsePayload>,
+	) -> Result<Self::Response, crate::client::OAuth2ClientError> {
+		self.value
+			.process_response(endpoint, http_client, response)
+			.await
+	}
+}
+
 pub trait AddState {
 	type Output;
 
 	fn with_state(self, state: Option<StateBuf>) -> Self::Output;
 }
 
-impl<T> AddState for T
-where
-	T: RequestBuilder,
-{
-	type Output = T::Mapped<Stateful<T::Request>>;
+impl<E, T> AddState for RequestBuilder<E, T> {
+	type Output = RequestBuilder<E, Stateful<T>>;
 
 	fn with_state(self, state: Option<StateBuf>) -> Self::Output {
 		self.map(|value| Stateful::new(value, state))

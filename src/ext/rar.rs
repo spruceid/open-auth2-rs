@@ -128,12 +128,11 @@ pub trait AddAuthorizationDetails<'a, D> {
 	fn with_authorization_details(self, authorization_details: &'a [D]) -> Self::Output;
 }
 
-impl<'a, D, T> AddAuthorizationDetails<'a, D> for T
+impl<'a, D, E, T> AddAuthorizationDetails<'a, D> for RequestBuilder<E, T>
 where
-	T: RequestBuilder,
 	D: 'a,
 {
-	type Output = T::Mapped<WithAuthorizationDetails<'a, D, T::Request>>;
+	type Output = RequestBuilder<E, WithAuthorizationDetails<'a, D, T>>;
 
 	fn with_authorization_details(self, authorization_details: &'a [D]) -> Self::Output {
 		self.map(|value| WithAuthorizationDetails::new(value, authorization_details))
