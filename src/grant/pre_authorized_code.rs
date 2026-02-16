@@ -12,7 +12,7 @@ use crate::{
 		authorization::AnyAuthorizationEndpoint,
 		token::{TokenEndpoint, TokenResponse},
 	},
-	http::{self, WwwFormUrlEncoded, expect_content_type},
+	transport::{APPLICATION_JSON, HttpClient, WwwFormUrlEncoded, expect_content_type},
 };
 
 impl<'a, C> TokenEndpoint<'a, C>
@@ -114,7 +114,7 @@ where
 	async fn build_request(
 		&self,
 		endpoint: &TokenEndpoint<'a, C>,
-		_http_client: &impl http::HttpClient,
+		_http_client: &impl HttpClient,
 	) -> Result<http::Request<Self::RequestBody<'_>>, OAuth2ClientError> {
 		Ok(http::Request::builder()
 			.method(http::Method::POST)
@@ -132,7 +132,7 @@ where
 			return Err(OAuth2ClientError::server(response.status()));
 		}
 
-		expect_content_type(response.headers(), &http::APPLICATION_JSON)?;
+		expect_content_type(response.headers(), &APPLICATION_JSON)?;
 
 		let body = serde_json::from_slice(response.body()).map_err(OAuth2ClientError::response)?;
 
@@ -142,7 +142,7 @@ where
 	async fn process_response(
 		&self,
 		_endpoint: &TokenEndpoint<'a, C>,
-		_http_client: &impl crate::http::HttpClient,
+		_http_client: &impl HttpClient,
 		response: http::Response<Self::ResponsePayload>,
 	) -> Result<Self::Response, OAuth2ClientError> {
 		Ok(response.into_body())

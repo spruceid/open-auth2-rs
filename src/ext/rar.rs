@@ -3,11 +3,14 @@
 //! See: <https://www.rfc-editor.org/rfc/rfc9396.html>
 
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use std::ops::{Deref, DerefMut};
+use std::{
+	borrow::Borrow,
+	ops::{Deref, DerefMut},
+};
 
 use crate::{
 	endpoints::{Redirect, RequestBuilder, SendRequest},
-	oauth2_extension,
+	transport::HttpClient,
 };
 
 /// Authorization Details Object.
@@ -51,12 +54,35 @@ impl<D> DerefMut for AuthorizationDetails<D> {
 	}
 }
 
-oauth2_extension! {
-	#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
-	pub struct WithAuthorizationDetails<'a, D: AuthorizationDetailsObject> {
-		pub authorization_details: &'a [D]
+#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[serde(bound = "D: AuthorizationDetailsObject, T: Serialize")]
+pub struct WithAuthorizationDetails<'a, D, T> {
+	pub authorization_details: &'a [D],
 
-		=> #[serde(flatten)]
+	#[serde(flatten)]
+	pub value: T,
+}
+
+impl<'a, D, T> WithAuthorizationDetails<'a, D, T> {
+	pub fn new(value: T, authorization_details: &'a [D]) -> Self {
+		Self {
+			value,
+			authorization_details,
+		}
+	}
+}
+
+impl<'a, D, T> Deref for WithAuthorizationDetails<'a, D, T> {
+	type Target = T;
+
+	fn deref(&self) -> &Self::Target {
+		&self.value
+	}
+}
+
+impl<'a, D, T> Borrow<T> for WithAuthorizationDetails<'a, D, T> {
+	fn borrow(&self) -> &T {
+		&self.value
 	}
 }
 
@@ -76,7 +102,7 @@ where
 	async fn build_request(
 		&self,
 		endpoint: &E,
-		http_client: &impl crate::http::HttpClient,
+		http_client: &impl HttpClient,
 	) -> Result<http::Request<Self::RequestBody<'_>>, crate::client::OAuth2ClientError> {
 		self.value
 			.build_request(endpoint, http_client)
@@ -98,7 +124,7 @@ where
 	async fn process_response(
 		&self,
 		endpoint: &E,
-		http_client: &impl crate::http::HttpClient,
+		http_client: &impl crate::transport::HttpClient,
 		response: http::Response<Self::ResponsePayload>,
 	) -> Result<Self::Response, crate::client::OAuth2ClientError> {
 		self.value

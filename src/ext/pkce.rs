@@ -11,16 +11,35 @@ use str_newtype::StrNewType;
 
 use crate::{
 	endpoints::{Redirect, RequestBuilder, SendRequest},
-	oauth2_extension,
+	transport::HttpClient,
 };
 
-oauth2_extension! {
-	#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-	pub struct WithPkceChallenge {
-		#[serde(flatten)]
-		pub pkce: PkceCodeChallengeAndMethod
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct WithPkceChallenge<T> {
+	#[serde(flatten)]
+	pub pkce: PkceCodeChallengeAndMethod,
 
-		=> #[serde(flatten)]
+	#[serde(flatten)]
+	pub value: T,
+}
+
+impl<T> WithPkceChallenge<T> {
+	pub fn new(value: T, pkce: PkceCodeChallengeAndMethod) -> Self {
+		Self { value, pkce }
+	}
+}
+
+impl<T> std::ops::Deref for WithPkceChallenge<T> {
+	type Target = T;
+
+	fn deref(&self) -> &Self::Target {
+		&self.value
+	}
+}
+
+impl<T> std::borrow::Borrow<T> for WithPkceChallenge<T> {
+	fn borrow(&self) -> &T {
+		&self.value
 	}
 }
 
@@ -53,7 +72,7 @@ where
 	async fn build_request(
 		&self,
 		endpoint: &E,
-		http_client: &impl crate::http::HttpClient,
+		http_client: &impl HttpClient,
 	) -> Result<http::Request<Self::RequestBody<'_>>, crate::client::OAuth2ClientError> {
 		self.value
 			.build_request(endpoint, http_client)
@@ -72,7 +91,7 @@ where
 	async fn process_response(
 		&self,
 		endpoint: &E,
-		http_client: &impl crate::http::HttpClient,
+		http_client: &impl crate::transport::HttpClient,
 		response: http::Response<Self::ResponsePayload>,
 	) -> Result<Self::Response, crate::client::OAuth2ClientError> {
 		self.value
@@ -95,12 +114,34 @@ impl<E, T> AddPkceChallenge for RequestBuilder<E, T> {
 	}
 }
 
-oauth2_extension! {
-	#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-	pub struct WithPkceVerifier<'a> {
-		pub pkce_verifier: &'a PkceCodeVerifier
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct WithPkceVerifier<'a, T> {
+	pub pkce_verifier: &'a PkceCodeVerifier,
 
-		=> #[serde(flatten)]
+	#[serde(flatten)]
+	pub value: T,
+}
+
+impl<'a, T> WithPkceVerifier<'a, T> {
+	pub fn new(value: T, pkce_verifier: &'a PkceCodeVerifier) -> Self {
+		Self {
+			value,
+			pkce_verifier,
+		}
+	}
+}
+
+impl<'a, T> std::ops::Deref for WithPkceVerifier<'a, T> {
+	type Target = T;
+
+	fn deref(&self) -> &Self::Target {
+		&self.value
+	}
+}
+
+impl<'a, T> std::borrow::Borrow<T> for WithPkceVerifier<'a, T> {
+	fn borrow(&self) -> &T {
+		&self.value
 	}
 }
 
@@ -119,7 +160,7 @@ where
 	async fn build_request<'b>(
 		&'b self,
 		endpoint: &E,
-		http_client: &impl crate::http::HttpClient,
+		http_client: &impl crate::transport::HttpClient,
 	) -> Result<http::Request<Self::RequestBody<'b>>, crate::client::OAuth2ClientError> {
 		Ok(self
 			.value
@@ -139,7 +180,7 @@ where
 	async fn process_response(
 		&self,
 		endpoint: &E,
-		http_client: &impl crate::http::HttpClient,
+		http_client: &impl crate::transport::HttpClient,
 		response: http::Response<Self::ResponsePayload>,
 	) -> Result<Self::Response, crate::client::OAuth2ClientError> {
 		self.value
@@ -411,7 +452,7 @@ const fn validate_verifier_or_challenge(bytes: &[u8]) -> bool {
 	let mut i = 0;
 
 	while i < bytes.len() {
-		if bytes[i].is_ascii_alphanumeric() && matches!(bytes[i], b'-' | b'.' | b'_' | b'~') {
+		if !bytes[i].is_ascii_alphanumeric() && !matches!(bytes[i], b'-' | b'.' | b'_' | b'~') {
 			return false;
 		}
 

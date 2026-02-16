@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
 	client::{OAuth2Client, OAuth2ClientError},
-	http::{ContentType, HttpClient},
+	transport::{ContentType, HttpClient},
 };
 
 pub mod authorization;

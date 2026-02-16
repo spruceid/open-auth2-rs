@@ -17,7 +17,7 @@ use crate::{
 		Endpoint, Redirect, SendRequest,
 		authorization::{AnyAuthorizationEndpoint, AuthorizationEndpoint},
 	},
-	http::{APPLICATION_JSON, HttpClient, WwwFormUrlEncoded, expect_content_type},
+	transport::{APPLICATION_JSON, HttpClient, WwwFormUrlEncoded, expect_content_type},
 };
 
 pub struct PushedAuthorizationEndpoint<'a, C> {

@@ -6,7 +6,10 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use str_newtype::StrNewType;
 
-use crate::endpoints::{Redirect, RequestBuilder, SendRequest};
+use crate::{
+	endpoints::{Redirect, RequestBuilder, SendRequest},
+	transport::HttpClient,
+};
 
 use super::is_vschar;
 
@@ -121,7 +124,7 @@ where
 	async fn build_request(
 		&self,
 		endpoint: &E,
-		http_client: &impl crate::http::HttpClient,
+		http_client: &impl crate::transport::HttpClient,
 	) -> Result<http::Request<Self::RequestBody<'_>>, crate::client::OAuth2ClientError> {
 		self.value
 			.build_request(endpoint, http_client)
@@ -140,7 +143,7 @@ where
 	async fn process_response(
 		&self,
 		endpoint: &E,
-		http_client: &impl crate::http::HttpClient,
+		http_client: &impl HttpClient,
 		response: http::Response<Self::ResponsePayload>,
 	) -> Result<Self::Response, crate::client::OAuth2ClientError> {
 		self.value

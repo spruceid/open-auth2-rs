@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
 	client::OAuth2Client,
 	endpoints::{Endpoint, Redirect, RequestBuilder},
-	http::{ContentType, WwwFormUrlEncoded},
+	transport::{ContentType, WwwFormUrlEncoded},
 };
 
 pub struct AuthorizationEndpoint<'a, C> {
@@ -58,19 +58,6 @@ where
 		request
 	}
 }
-
-// impl<'a, C: OAuth2Client> AuthorizationEndpointLike for AuthorizationEndpoint<'a, C> {
-// 	type Client = C;
-// 	type RequestBuilder<T> = AuthorizationRequestBuilder<'a, C, T>;
-
-// 	fn client(&self) -> &Self::Client {
-// 		self.client
-// 	}
-
-// 	fn build_request<T>(self, request: T) -> Self::RequestBuilder<T> {
-// 		AuthorizationRequestBuilder::new(self, request)
-// 	}
-// }
 
 impl<'a, C, T> RequestBuilder<AuthorizationEndpoint<'a, C>, T> {
 	pub fn into_uri(self) -> UriBuf

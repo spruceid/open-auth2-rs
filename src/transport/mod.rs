@@ -1,11 +1,11 @@
-pub use http::*;
+use http::{HeaderMap, HeaderValue, header};
+use serde::Serialize;
+
+use crate::client::OAuth2ClientError;
 
 mod client;
 
 pub use client::*;
-use serde::Serialize;
-
-use crate::client::OAuth2ClientError;
 
 pub const APPLICATION_JSON: HeaderValue = HeaderValue::from_static("application/json");
 

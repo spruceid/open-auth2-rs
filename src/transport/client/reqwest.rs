@@ -1,4 +1,6 @@
-use crate::{client::OAuth2ClientError, http::HttpClient};
+use crate::client::OAuth2ClientError;
+
+use super::HttpClient;
 
 impl HttpClient for reqwest::Client {
 	async fn send(

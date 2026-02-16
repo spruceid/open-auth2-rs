@@ -3,7 +3,7 @@ use str_newtype::StrNewType;
 use crate::{
 	client::OAuth2ClientError,
 	endpoints::{RequestBuilder, SendRequest, token::TokenType},
-	http, oauth2_extension,
+	transport::HttpClient,
 };
 
 use super::is_vschar;
@@ -42,10 +42,33 @@ impl AccessToken {
 	}
 }
 
-oauth2_extension! {
-	pub struct WithAccessToken<'a, Ty> {
-		pub token_type: &'a Ty,
-		pub access_token: &'a AccessToken
+pub struct WithAccessToken<'a, Ty, T> {
+	pub token_type: &'a Ty,
+	pub access_token: &'a AccessToken,
+	pub value: T,
+}
+
+impl<'a, Ty, T> WithAccessToken<'a, Ty, T> {
+	pub fn new(value: T, token_type: &'a Ty, access_token: &'a AccessToken) -> Self {
+		Self {
+			value,
+			token_type,
+			access_token,
+		}
+	}
+}
+
+impl<'a, Ty, T> std::ops::Deref for WithAccessToken<'a, Ty, T> {
+	type Target = T;
+
+	fn deref(&self) -> &Self::Target {
+		&self.value
+	}
+}
+
+impl<'a, Ty, T> std::borrow::Borrow<T> for WithAccessToken<'a, Ty, T> {
+	fn borrow(&self) -> &T {
+		&self.value
 	}
 }
 
@@ -65,7 +88,7 @@ where
 	async fn build_request(
 		&self,
 		endpoint: &E,
-		http_client: &impl http::HttpClient,
+		http_client: &impl HttpClient,
 	) -> Result<http::Request<Self::RequestBody<'_>>, crate::client::OAuth2ClientError> {
 		let mut request = self.value.build_request(endpoint, http_client).await?;
 		request.headers_mut().insert(
@@ -88,7 +111,7 @@ where
 	async fn process_response(
 		&self,
 		endpoint: &E,
-		http_client: &impl http::HttpClient,
+		http_client: &impl HttpClient,
 		response: http::Response<Self::ResponsePayload>,
 	) -> Result<Self::Response, OAuth2ClientError> {
 		self.value
