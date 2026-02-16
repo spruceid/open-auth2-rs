@@ -133,7 +133,7 @@ impl<E, T> AddPkceChallenge for RequestBuilder<E, T> {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct WithPkceVerifier<'a, T> {
 	/// The PKCE code verifier.
-	pub pkce_verifier: &'a PkceCodeVerifier,
+	pub code_verifier: &'a PkceCodeVerifier,
 
 	/// The inner request being extended.
 	#[serde(flatten)]
@@ -142,10 +142,10 @@ pub struct WithPkceVerifier<'a, T> {
 
 impl<'a, T> WithPkceVerifier<'a, T> {
 	/// Creates a new [`WithPkceVerifier`] wrapping the given request.
-	pub fn new(value: T, pkce_verifier: &'a PkceCodeVerifier) -> Self {
+	pub fn new(value: T, code_verifier: &'a PkceCodeVerifier) -> Self {
 		Self {
 			value,
-			pkce_verifier,
+			code_verifier,
 		}
 	}
 }
@@ -185,7 +185,7 @@ where
 			.value
 			.build_request(endpoint, http_client)
 			.await?
-			.map(|value| WithPkceVerifier::new(value, self.pkce_verifier)))
+			.map(|value| WithPkceVerifier::new(value, self.code_verifier)))
 	}
 
 	fn decode_response(
@@ -218,7 +218,7 @@ where
 		Self: 'b;
 
 	fn build_query(&self) -> Self::RequestBody<'_> {
-		WithPkceVerifier::new(self.value.build_query(), self.pkce_verifier)
+		WithPkceVerifier::new(self.value.build_query(), self.code_verifier)
 	}
 }
 
