@@ -81,12 +81,12 @@ async fn run(http_client: &impl HttpClient) -> Result<(), Box<dyn std::error::Er
 
 ## Modules
 
-- [`client`](https://docs.rs/open-auth2/latest/open_auth2/client/) — OAuth 2.0 client trait and error types.
+- [`client`](https://docs.rs/open-auth2/latest/open_auth2/client/) — OAuth 2.0 client trait and types.
 - [`endpoints`](https://docs.rs/open-auth2/latest/open_auth2/endpoints/) — Endpoint abstractions (authorization, token, PAR).
 - [`ext`](https://docs.rs/open-auth2/latest/open_auth2/ext/) — Built-in protocol extensions (PKCE, RAR).
 - [`grant`](https://docs.rs/open-auth2/latest/open_auth2/grant/) — Grant type implementations (authorization code,
   pre-authorized code).
-- [`server`](https://docs.rs/open-auth2/latest/open_auth2/server/) — Server-side response types.
+- [`server`](https://docs.rs/open-auth2/latest/open_auth2/server/) — OAuth 2.0 server trait and types.
 - [`transport`](https://docs.rs/open-auth2/latest/open_auth2/transport/) — HTTP transport layer and content type encoding.
 - [`util`](https://docs.rs/open-auth2/latest/open_auth2/util/) — URI query string utilities.
 
