@@ -38,3 +38,13 @@ impl Code {
 		i > 0
 	}
 }
+
+#[macro_export]
+macro_rules! code {
+	($value:literal) => {{
+		match $crate::Code::new($value) {
+			Ok(value) => value,
+			Err(_) => panic!("invalid code"),
+		}
+	}};
+}

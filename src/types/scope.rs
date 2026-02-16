@@ -45,6 +45,16 @@ impl ScopeToken {
 	}
 }
 
+#[macro_export]
+macro_rules! scope_token {
+	($value:literal) => {{
+		match $crate::ScopeToken::new($value) {
+			Ok(value) => value,
+			Err(_) => panic!("invalid scope token"),
+		}
+	}};
+}
+
 /// Conversion trait for types that can be turned into an optional [`ScopeBuf`].
 pub trait IntoScope {
 	/// Converts this value into an optional scope.
@@ -148,6 +158,16 @@ impl<'a> IntoIterator for &'a Scope {
 	fn into_iter(self) -> Self::IntoIter {
 		self.iter()
 	}
+}
+
+#[macro_export]
+macro_rules! scope {
+	($value:literal) => {{
+		match $crate::Scope::new($value) {
+			Ok(value) => value,
+			Err(_) => panic!("invalid scope"),
+		}
+	}};
 }
 
 /// Iterator over the individual [`ScopeToken`]s in a [`Scope`].

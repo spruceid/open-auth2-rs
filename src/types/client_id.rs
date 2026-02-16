@@ -44,3 +44,13 @@ impl ClientId {
 		true
 	}
 }
+
+#[macro_export]
+macro_rules! client_id {
+	($value:literal) => {{
+		match $crate::ClientId::new($value) {
+			Ok(value) => value,
+			Err(_) => panic!("invalid client identifier"),
+		}
+	}};
+}

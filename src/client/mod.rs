@@ -9,12 +9,10 @@ use crate::ClientId;
 /// [`ClientId`] and an associated type for deserializing extension parameters
 /// included in token responses.
 pub trait OAuth2Client {
-	/// Additional parameters returned alongside the standard token response
-	/// fields.
+	/// Expected token response type.
 	///
-	/// Use [`NoExtension`](crate::endpoints::NoExtension) when no extra
-	/// parameters are expected.
-	type TokenParams: DeserializeOwned;
+	/// If you're not sure, use [`TokenResponse`](crate::endpoints::token::TokenResponse).
+	type TokenResponse: DeserializeOwned;
 
 	/// Returns the client identifier.
 	fn client_id(&self) -> &ClientId;

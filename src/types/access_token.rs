@@ -47,6 +47,16 @@ impl AccessToken {
 	}
 }
 
+#[macro_export]
+macro_rules! access_token {
+	($value:literal) => {{
+		match $crate::AccessToken::new($value) {
+			Ok(value) => value,
+			Err(_) => panic!("invalid access token"),
+		}
+	}};
+}
+
 /// Extension wrapper that attaches an access token and token type to a
 /// request.
 ///

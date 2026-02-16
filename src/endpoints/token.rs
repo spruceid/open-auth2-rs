@@ -60,40 +60,6 @@ where
 	}
 }
 
-// pub struct TokenRequestBuilder<'a, C, T> {
-// 	pub endpoint: TokenEndpoint<'a, C>,
-// 	pub request: T,
-// }
-
-// impl<'a, C, T> TokenRequestBuilder<'a, C, T> {
-// 	pub fn new(endpoint: TokenEndpoint<'a, C>, request: T) -> Self {
-// 		Self { endpoint, request }
-// 	}
-
-// 	pub fn map<U>(self, f: impl FnOnce(T) -> U) -> TokenRequestBuilder<'a, C, U> {
-// 		TokenRequestBuilder {
-// 			endpoint: self.endpoint,
-// 			request: f(self.request),
-// 		}
-// 	}
-
-// 	pub async fn send(self, http_client: &impl HttpClient) -> Result<T::Response, OAuth2ClientError>
-// 	where
-// 		T: SendRequest<TokenEndpoint<'a, C>>,
-// 	{
-// 		self.request.send(&self.endpoint, http_client).await
-// 	}
-// }
-
-// impl<'a, C, T> RequestBuilder for TokenRequestBuilder<'a, C, T> {
-// 	type Request = T;
-// 	type Mapped<U> = TokenRequestBuilder<'a, C, U>;
-
-// 	fn map<U>(self, f: impl FnOnce(Self::Request) -> U) -> Self::Mapped<U> {
-// 		self.map(f)
-// 	}
-// }
-
 /// Marker trait for OAuth 2.0 token types (e.g. `"Bearer"`, `"DPoP"`).
 ///
 /// Token types must be serializable, deserializable, and displayable so they

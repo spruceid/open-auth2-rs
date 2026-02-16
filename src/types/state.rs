@@ -51,6 +51,16 @@ impl State {
 	}
 }
 
+#[macro_export]
+macro_rules! state {
+	($value:literal) => {{
+		match $crate::State::new($value) {
+			Ok(value) => value,
+			Err(_) => panic!("invalid state"),
+		}
+	}};
+}
+
 impl StateBuf {
 	/// Generates a new random, base64url-encoded 128-bit CSRF token.
 	pub fn new_random() -> Self {

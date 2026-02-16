@@ -8,9 +8,7 @@ use crate::{
 	ClientIdBuf,
 	client::{OAuth2Client, OAuth2ClientError},
 	endpoints::{
-		HttpRequest, RequestBuilder,
-		authorization::AnyAuthorizationEndpoint,
-		token::{TokenEndpoint, TokenResponse},
+		HttpRequest, RequestBuilder, authorization::AnyAuthorizationEndpoint, token::TokenEndpoint,
 	},
 	transport::{APPLICATION_JSON, HttpClient, WwwFormUrlEncoded, expect_content_type},
 };
@@ -122,8 +120,8 @@ where
 		= &'b Self
 	where
 		Self: 'b;
-	type Response = TokenResponse<String, C::TokenParams>;
-	type ResponsePayload = TokenResponse<String, C::TokenParams>;
+	type Response = C::TokenResponse;
+	type ResponsePayload = C::TokenResponse;
 
 	async fn build_request(
 		&self,

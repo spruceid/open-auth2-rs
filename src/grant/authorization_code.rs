@@ -11,7 +11,7 @@ use crate::{
 	endpoints::{
 		HttpRequest, RedirectRequest, RequestBuilder,
 		authorization::{AnyAuthorizationEndpoint, AuthorizationEndpoint},
-		token::{TokenEndpoint, TokenResponse},
+		token::TokenEndpoint,
 	},
 	server::ErrorResponse,
 	transport::{APPLICATION_JSON, HttpClient, WwwFormUrlEncoded, expect_content_type},
@@ -253,8 +253,8 @@ where
 		= &'b AuthorizationCodeTokenRequest
 	where
 		Self: 'b;
-	type Response = TokenResponse<String, C::TokenParams>;
-	type ResponsePayload = TokenResponse<String, C::TokenParams>;
+	type Response = C::TokenResponse;
+	type ResponsePayload = C::TokenResponse;
 
 	async fn build_request(
 		&self,
