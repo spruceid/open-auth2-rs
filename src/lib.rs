@@ -10,19 +10,11 @@
 //! It is meant to provide a highly modular architecture to accommodate the
 //! numerous extensions to the OAuth 2.0 framework.
 //!
-//! # Modules
-//!
-//! - [`client`] — OAuth 2.0 client trait and error types.
-//! - [`endpoints`] — Endpoint abstractions (authorization, token, PAR).
-//! - [`ext`] — Protocol extensions (PKCE, RAR).
-//! - [`grant`] — Grant type implementations (authorization code,
-//!   pre-authorized code).
-//! - [`server`] — Server-side response types.
-//! - [`transport`] — HTTP transport layer and content type encoding.
-//! - [`util`] — URI query string utilities.
-//!
-//! Core OAuth 2.0 types ([`AccessToken`], [`ClientId`], [`Code`], [`Scope`],
-//! [`State`], etc.) are re-exported at the crate root.
+//! [rfc6749]: https://datatracker.ietf.org/doc/html/rfc6749
+//! [rfc7636]: https://datatracker.ietf.org/doc/html/rfc7636
+//! [rfc9126]: https://www.rfc-editor.org/rfc/rfc9126.html
+//! [rfc9396]: https://www.rfc-editor.org/rfc/rfc9396.html
+//! [oid4vci]: https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html
 //!
 //! # Client usage
 //!
@@ -83,11 +75,16 @@
 //! }
 //! ```
 //!
-//! [rfc6749]: https://datatracker.ietf.org/doc/html/rfc6749
-//! [rfc7636]: https://datatracker.ietf.org/doc/html/rfc7636
-//! [rfc9126]: https://www.rfc-editor.org/rfc/rfc9126.html
-//! [rfc9396]: https://www.rfc-editor.org/rfc/rfc9396.html
-//! [oid4vci]: https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html
+//! # Modules
+//!
+//! - [`client`](crate::client) — OAuth 2.0 client trait and error types.
+//! - [`endpoints`](crate::endpoints) — Endpoint abstractions (authorization, token, PAR).
+//! - [`ext`](crate::ext) — Built-in protocol extensions (PKCE, RAR).
+//! - [`grant`](crate::grant) — Grant type implementations (authorization code,
+//!   pre-authorized code).
+//! - [`server`](crate::server) — Server-side response types.
+//! - [`transport`](crate::transport) — HTTP transport layer and content type encoding.
+//! - [`util`](crate::util) — URI query string utilities.
 #[cfg(feature = "reqwest")]
 pub use reqwest;
 
