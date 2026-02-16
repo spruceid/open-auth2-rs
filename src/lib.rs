@@ -1,5 +1,3 @@
-//! Implementation of the [OAuth 2.0 Authorization Framework][rfc6749].
-//!
 //! This crate provides building blocks for implementing OAuth 2.0 clients and
 //! servers, following the specifications defined in [RFC 6749][rfc6749] and
 //! related extensions:
@@ -8,6 +6,9 @@
 //! - [RFC 9126][rfc9126] — Pushed Authorization Requests (PAR)
 //! - [RFC 9396][rfc9396] — Rich Authorization Requests (RAR)
 //! - [OpenID4VCI][oid4vci] — Pre-Authorized Code Grant
+//!
+//! It is meant to provide a highly modular architecture to accommodate the
+//! numerous extensions to the OAuth 2.0 framework.
 //!
 //! # Modules
 //!
