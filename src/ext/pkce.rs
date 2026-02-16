@@ -500,3 +500,130 @@ const fn validate_verifier_or_challenge(bytes: &[u8]) -> bool {
 
 	true
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	// 43 characters of valid unreserved chars.
+	const MIN_VALID: &str = "abcdefghijklmnopqrstuvwxyz01234567890123456";
+
+	// --- PkceCodeChallenge ---
+
+	#[test]
+	fn valid_challenge() {
+		assert!(PkceCodeChallenge::new(MIN_VALID).is_ok());
+	}
+
+	#[test]
+	fn challenge_too_short() {
+		// 42 characters — one below minimum.
+		assert!(PkceCodeChallenge::new(&MIN_VALID[..42]).is_err());
+	}
+
+	#[test]
+	fn challenge_too_long() {
+		// 129 characters — one above maximum.
+		let long = "a".repeat(129);
+		assert!(PkceCodeChallenge::new(&long).is_err());
+	}
+
+	#[test]
+	fn challenge_max_length() {
+		let max = "a".repeat(128);
+		assert!(PkceCodeChallenge::new(&max).is_ok());
+	}
+
+	#[test]
+	fn challenge_allows_unreserved_chars() {
+		// Alphanumeric + `-` `.` `_` `~`
+		let s = "abcdefghijklmnopqrstuvwxyz-._~ABCDEFGHIJKLMN";
+		assert!(PkceCodeChallenge::new(s).is_ok());
+	}
+
+	#[test]
+	fn challenge_rejects_invalid_chars() {
+		let mut bytes = MIN_VALID.as_bytes().to_vec();
+		bytes[0] = b' ';
+		let s = String::from_utf8(bytes).unwrap();
+		assert!(PkceCodeChallenge::new(&s).is_err());
+	}
+
+	#[test]
+	fn challenge_rejects_plus() {
+		let mut bytes = MIN_VALID.as_bytes().to_vec();
+		bytes[0] = b'+';
+		let s = String::from_utf8(bytes).unwrap();
+		assert!(PkceCodeChallenge::new(&s).is_err());
+	}
+
+	// --- PkceCodeVerifier ---
+
+	#[test]
+	fn valid_verifier() {
+		assert!(PkceCodeVerifier::new(MIN_VALID).is_ok());
+	}
+
+	#[test]
+	fn verifier_too_short() {
+		assert!(PkceCodeVerifier::new(&MIN_VALID[..42]).is_err());
+	}
+
+	#[test]
+	fn verifier_too_long() {
+		let long = "a".repeat(129);
+		assert!(PkceCodeVerifier::new(&long).is_err());
+	}
+
+	#[test]
+	fn random_verifier_is_valid() {
+		let verifier = PkceCodeVerifierBuf::new_random_len(32);
+		assert!(PkceCodeVerifier::new(verifier.as_str()).is_ok());
+	}
+
+	#[test]
+	fn random_verifier_max_len_is_valid() {
+		let verifier = PkceCodeVerifierBuf::new_random_len(96);
+		assert!(PkceCodeVerifier::new(verifier.as_str()).is_ok());
+	}
+
+	// --- PkceCodeChallengeMethod ---
+
+	#[test]
+	fn parse_challenge_method() {
+		assert_eq!(
+			"S256".parse::<PkceCodeChallengeMethod>().unwrap(),
+			PkceCodeChallengeMethod::S256,
+		);
+		assert_eq!(
+			"plain".parse::<PkceCodeChallengeMethod>().unwrap(),
+			PkceCodeChallengeMethod::Plain,
+		);
+		assert!("invalid".parse::<PkceCodeChallengeMethod>().is_err());
+	}
+
+	#[test]
+	fn challenge_method_as_str() {
+		assert_eq!(PkceCodeChallengeMethod::S256.as_str(), "S256");
+		assert_eq!(PkceCodeChallengeMethod::Plain.as_str(), "plain");
+	}
+
+	// --- PkceCodeChallengeAndMethod ---
+
+	#[test]
+	fn sha256_challenge_is_valid() {
+		let (challenge, _verifier) = PkceCodeChallengeAndMethod::new_random_sha256();
+		assert_eq!(challenge.method, PkceCodeChallengeMethod::S256);
+		assert!(PkceCodeChallenge::new(challenge.as_str()).is_ok());
+	}
+
+	#[test]
+	fn plain_challenge_equals_verifier() {
+		let verifier = PkceCodeVerifierBuf::new_random_len(32);
+		let challenge = PkceCodeChallengeAndMethod::from_code_verifier(
+			&verifier,
+			PkceCodeChallengeMethod::Plain,
+		);
+		assert_eq!(challenge.as_str(), verifier.as_str());
+	}
+}

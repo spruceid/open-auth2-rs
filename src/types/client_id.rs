@@ -54,3 +54,40 @@ macro_rules! client_id {
 		}
 	}};
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn valid_client_id() {
+		assert!(ClientId::new("my-client").is_ok());
+		assert!(ClientId::new("a").is_ok());
+		assert!(ClientId::new("client 123").is_ok());
+	}
+
+	#[test]
+	fn empty_client_id_is_valid() {
+		// Grammar is `*VSCHAR`, so empty is allowed.
+		assert!(ClientId::new("").is_ok());
+	}
+
+	#[test]
+	fn client_id_rejects_control_chars() {
+		assert!(ClientId::new("\x00").is_err());
+		assert!(ClientId::new("\x1f").is_err());
+		assert!(ClientId::new("abc\ndef").is_err());
+		assert!(ClientId::new("abc\x7f").is_err());
+	}
+
+	#[test]
+	fn valid_client_id_buf() {
+		assert!(ClientIdBuf::new("my-client".to_owned()).is_ok());
+		assert!(ClientIdBuf::new("".to_owned()).is_ok());
+	}
+
+	#[test]
+	fn invalid_client_id_buf() {
+		assert!(ClientIdBuf::new("\x00".to_owned()).is_err());
+	}
+}

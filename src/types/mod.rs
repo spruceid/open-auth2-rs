@@ -23,3 +23,8 @@ pub use state::*;
 const fn is_vschar(c: u8) -> bool {
 	c >= 0x20 && c <= 0x7e
 }
+
+/// Returns `true` if the byte is a NQCHAR.
+const fn is_nqchar(c: u8) -> bool {
+	c == 0x21 || (c >= 0x23 && c <= 0x5b) || (c >= 0x5d && c <= 0x7e)
+}

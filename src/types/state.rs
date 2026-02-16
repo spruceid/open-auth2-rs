@@ -193,3 +193,41 @@ impl<E, T> AddState for RequestBuilder<E, T> {
 		self.map(|value| Stateful::new(value, state))
 	}
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn valid_state() {
+		assert!(State::new("abc123").is_ok());
+		assert!(State::new("a").is_ok());
+		assert!(State::new("state with spaces").is_ok());
+		assert!(State::new("~!@#$%^&*()").is_ok());
+	}
+
+	#[test]
+	fn empty_state_is_invalid() {
+		assert!(State::new("").is_err());
+	}
+
+	#[test]
+	fn state_rejects_control_chars() {
+		assert!(State::new("\x00").is_err());
+		assert!(State::new("\x1f").is_err());
+		assert!(State::new("abc\ndef").is_err());
+		assert!(State::new("abc\x7f").is_err());
+	}
+
+	#[test]
+	fn random_state_is_valid() {
+		let state = StateBuf::new_random();
+		assert!(State::new(state.as_str()).is_ok());
+	}
+
+	#[test]
+	fn random_state_len_is_valid() {
+		let state = StateBuf::new_random_len(32);
+		assert!(State::new(state.as_str()).is_ok());
+	}
+}

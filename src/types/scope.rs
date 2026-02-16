@@ -1,5 +1,7 @@
 use str_newtype::StrNewType;
 
+use super::is_nqchar;
+
 /// A single OAuth 2.0 scope token (borrowed).
 ///
 /// Scope tokens are the individual components of a [`Scope`] value, separated
@@ -27,14 +29,10 @@ impl ScopeToken {
 
 	/// Validates that the given byte slice is a well-formed scope token.
 	pub const fn validate_bytes(bytes: &[u8]) -> bool {
-		const fn is_scope_token_char(c: u8) -> bool {
-			c == 0x21 || (c >= 0x23 && c <= 0x5b) || (c >= 0x5d && c <= 0x7e)
-		}
-
 		let mut i = 0;
 
 		while i < bytes.len() {
-			if !is_scope_token_char(bytes[i]) {
+			if !is_nqchar(bytes[i]) {
 				return false;
 			}
 
@@ -92,7 +90,7 @@ impl IntoScope for &[ScopeTokenBuf] {
 ///
 /// ```abnf
 /// scope       = scope-token *( SP scope-token )
-/// scope-token = 1*( %x21 / %x23-5B / %x5D-7E )
+/// scope-token = 1*NQCHAR
 /// ```
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, StrNewType)]
 #[newtype(serde, owned(ScopeBuf, derive(PartialEq, Eq, PartialOrd, Ord, Hash)))]
@@ -106,10 +104,6 @@ impl Scope {
 
 	/// Validates that the given byte slice is a well-formed scope.
 	pub const fn validate_bytes(bytes: &[u8]) -> bool {
-		const fn is_scope_token_char(c: u8) -> bool {
-			c == 0x21 || (c >= 0x23 && c <= 0x5b) || (c >= 0x5d && c <= 0x7e)
-		}
-
 		let mut i = 0;
 
 		let mut expect_token = true;
@@ -119,17 +113,17 @@ impl Scope {
 
 			while i < bytes.len() {
 				match bytes[i] {
-					c if is_scope_token_char(c) => {
+					c if is_nqchar(c) => {
 						scope_token_empty = false;
+						i += 1;
 					}
 					b' ' => {
 						expect_token = true;
+						i += 1;
 						break;
 					}
 					_ => return false,
 				}
-
-				i += 1;
 			}
 
 			if scope_token_empty {
@@ -237,5 +231,126 @@ impl<'a> IntoIterator for &'a ScopeBuf {
 
 	fn into_iter(self) -> Self::IntoIter {
 		self.iter()
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	// --- ScopeToken ---
+
+	#[test]
+	fn valid_scope_token() {
+		assert!(ScopeToken::new("openid").is_ok());
+		assert!(ScopeToken::new("read:user").is_ok());
+		assert!(ScopeToken::new("!!").is_ok());
+	}
+
+	#[test]
+	fn empty_scope_token_is_invalid() {
+		assert!(ScopeToken::new("").is_err());
+	}
+
+	#[test]
+	fn scope_token_rejects_space() {
+		// Space is the scope delimiter, not allowed inside a token.
+		assert!(ScopeToken::new("read write").is_err());
+	}
+
+	#[test]
+	fn scope_token_rejects_backslash() {
+		// 0x5C (backslash) is excluded from the grammar.
+		assert!(ScopeToken::new("ab\\cd").is_err());
+	}
+
+	#[test]
+	fn scope_token_rejects_double_quote() {
+		// 0x22 (double quote) is excluded from the grammar.
+		assert!(ScopeToken::new("ab\"cd").is_err());
+	}
+
+	#[test]
+	fn scope_token_rejects_control_chars() {
+		assert!(ScopeToken::new("\x00").is_err());
+		assert!(ScopeToken::new("\x1f").is_err());
+		assert!(ScopeToken::new("\x7f").is_err());
+	}
+
+	// --- Scope ---
+
+	#[test]
+	fn valid_scope() {
+		assert!(Scope::new("openid").is_ok());
+		assert!(Scope::new("openid profile email").is_ok());
+	}
+
+	#[test]
+	fn empty_scope_is_invalid() {
+		assert!(Scope::new("").is_err());
+	}
+
+	#[test]
+	fn scope_rejects_leading_space() {
+		assert!(Scope::new(" openid").is_err());
+	}
+
+	#[test]
+	fn scope_rejects_trailing_space() {
+		assert!(Scope::new("openid ").is_err());
+	}
+
+	#[test]
+	fn scope_rejects_double_space() {
+		assert!(Scope::new("openid  profile").is_err());
+	}
+
+	#[test]
+	fn scope_rejects_invalid_token_chars() {
+		assert!(Scope::new("open\"id").is_err());
+		assert!(Scope::new("open\\id").is_err());
+	}
+
+	#[test]
+	fn scope_list() {
+		Scope::new("openid profile").unwrap();
+	}
+
+	#[test]
+	fn scope_iter() {
+		let scope = Scope::new("openid profile email").unwrap();
+		let tokens: Vec<&str> = scope.iter().map(|t| t.as_str()).collect();
+		assert_eq!(tokens, vec!["openid", "profile", "email"]);
+	}
+
+	#[test]
+	fn scope_contains() {
+		let scope = Scope::new("openid profile").unwrap();
+		assert!(scope.contains(ScopeToken::new("openid").unwrap()));
+		assert!(!scope.contains(ScopeToken::new("email").unwrap()));
+	}
+
+	#[test]
+	fn scope_buf_insert() {
+		let mut scope = ScopeBuf::new("openid".to_owned()).unwrap();
+		assert!(scope.insert(ScopeToken::new("profile").unwrap()));
+		assert!(!scope.insert(ScopeToken::new("openid").unwrap()));
+		assert_eq!(scope.as_str(), "openid profile");
+	}
+
+	#[test]
+	fn scope_buf_from_tokens() {
+		let tokens = vec![
+			ScopeTokenBuf::new("openid".to_owned()).unwrap(),
+			ScopeTokenBuf::new("profile".to_owned()).unwrap(),
+		];
+		let scope = ScopeBuf::from_tokens(&tokens).unwrap();
+		assert_eq!(scope.as_str(), "openid profile");
+	}
+
+	#[test]
+	fn scope_buf_from_empty_tokens() {
+		let tokens: Vec<ScopeTokenBuf> = vec![];
+		assert!(ScopeBuf::from_tokens(&tokens).is_none());
 	}
 }

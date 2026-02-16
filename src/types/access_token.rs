@@ -167,3 +167,40 @@ where
 		self.map(|value| WithAccessToken::new(value, token_type, access_token))
 	}
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn valid_access_token() {
+		assert!(AccessToken::new("abc123").is_ok());
+		assert!(AccessToken::new("foo bar").is_ok());
+		assert!(AccessToken::new("a").is_ok());
+		assert!(AccessToken::new("~!@#$%^&*()").is_ok());
+	}
+
+	#[test]
+	fn empty_access_token_is_invalid() {
+		assert!(AccessToken::new("").is_err());
+	}
+
+	#[test]
+	fn access_token_rejects_control_chars() {
+		assert!(AccessToken::new("\x00").is_err());
+		assert!(AccessToken::new("\x1f").is_err());
+		assert!(AccessToken::new("abc\ndef").is_err());
+		assert!(AccessToken::new("abc\x7f").is_err());
+	}
+
+	#[test]
+	fn valid_access_token_buf() {
+		assert!(AccessTokenBuf::new("token123".to_owned()).is_ok());
+	}
+
+	#[test]
+	fn invalid_access_token_buf() {
+		assert!(AccessTokenBuf::new("".to_owned()).is_err());
+		assert!(AccessTokenBuf::new("\x00bad".to_owned()).is_err());
+	}
+}
