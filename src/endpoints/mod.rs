@@ -15,7 +15,7 @@ use iref::{
 	Uri, UriBuf,
 	uri::{Query, QueryBuf},
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use crate::{
 	client::{OAuth2Client, OAuth2ClientError},
@@ -25,10 +25,6 @@ use crate::{
 pub mod authorization;
 pub mod pushed_authorization;
 pub mod token;
-
-/// Placeholder type for token responses that carry no extension fields.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct NoExtension {}
 
 /// An OAuth 2.0 endpoint bound to a specific client.
 pub trait Endpoint {

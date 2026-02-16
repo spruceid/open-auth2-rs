@@ -3,6 +3,14 @@ use iref::UriBuf;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
+#[cfg(feature = "axum")]
+mod axum;
+pub mod metadata;
+
+#[cfg(feature = "axum")]
+pub use axum::*;
+pub use metadata::AuthorizationServerMetadata;
+
 /// An OAuth 2.0 error response.
 ///
 /// This is the standard error format returned by the authorization server

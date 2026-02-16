@@ -3,7 +3,15 @@ use iref::{
 	UriBuf,
 	uri::{Query, QueryBuf},
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+
+mod discoverable;
+
+pub use discoverable::*;
+
+/// Placeholder type for structs that carry no extension fields.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct NoExtension {}
 
 /// Extends the query parameters of a URI by serializing `value` as
 /// `application/x-www-form-urlencoded` and appending the result.

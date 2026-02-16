@@ -8,9 +8,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_with::skip_serializing_none;
 
 use crate::{
-	AccessTokenBuf, ScopeBuf,
-	client::OAuth2Client,
-	endpoints::{Endpoint, NoExtension},
+	AccessTokenBuf, ScopeBuf, client::OAuth2Client, endpoints::Endpoint, util::NoExtension,
 };
 
 /// The OAuth 2.0 token endpoint.

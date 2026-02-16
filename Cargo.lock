@@ -925,6 +925,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "374372d9ca7331cec26f307b12552554849143e6b2077be3553576aa9aa8258c"
 dependencies = [
  "iref-core",
+ "iref-macros",
 ]
 
 [[package]]
@@ -938,6 +939,17 @@ dependencies = [
  "smallvec",
  "static-regular-grammar",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "iref-macros"
+version = "3.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a29dc38c5cd20b63a148ca9addbc6d1c039bb41b536f3d77425f5eec1bdc892b"
+dependencies = [
+ "iref-core",
+ "quote",
+ "syn 2.0.114",
 ]
 
 [[package]]

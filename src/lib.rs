@@ -77,12 +77,12 @@
 //!
 //! # Modules
 //!
-//! - [`client`](crate::client) — OAuth 2.0 client trait and error types.
+//! - [`client`](crate::client) — OAuth 2.0 client trait and types.
 //! - [`endpoints`](crate::endpoints) — Endpoint abstractions (authorization, token, PAR).
 //! - [`ext`](crate::ext) — Built-in protocol extensions (PKCE, RAR).
 //! - [`grant`](crate::grant) — Grant type implementations (authorization code,
 //!   pre-authorized code).
-//! - [`server`](crate::server) — Server-side response types.
+//! - [`server`](crate::server) — OAuth 2.0 server trait and types.
 //! - [`transport`](crate::transport) — HTTP transport layer and content type encoding.
 //! - [`util`](crate::util) — URI query string utilities.
 #[cfg(feature = "reqwest")]
