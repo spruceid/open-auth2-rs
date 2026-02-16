@@ -1,12 +1,15 @@
 use str_newtype::StrNewType;
 
-/// Access Token Scope Token.
+/// A single OAuth 2.0 scope token (borrowed).
+///
+/// Scope tokens are the individual components of a [`Scope`] value, separated
+/// by spaces.
 ///
 /// See: <https://datatracker.ietf.org/doc/html/rfc6749#section-3.3>
 ///
 /// # Grammar
 ///
-/// ```
+/// ```abnf
 /// scope-token = 1*( %x21 / %x23-5B / %x5D-7E )
 /// ```
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, StrNewType)]
@@ -17,10 +20,12 @@ use str_newtype::StrNewType;
 pub struct ScopeToken(str);
 
 impl ScopeToken {
+	/// Validates that the given string is a well-formed scope token.
 	pub const fn validate_str(s: &str) -> bool {
 		Self::validate_bytes(s.as_bytes())
 	}
 
+	/// Validates that the given byte slice is a well-formed scope token.
 	pub const fn validate_bytes(bytes: &[u8]) -> bool {
 		const fn is_scope_token_char(c: u8) -> bool {
 			c == 0x21 || (c >= 0x23 && c <= 0x5b) || (c >= 0x5d && c <= 0x7e)
@@ -40,7 +45,11 @@ impl ScopeToken {
 	}
 }
 
+/// Conversion trait for types that can be turned into an optional [`ScopeBuf`].
 pub trait IntoScope {
+	/// Converts this value into an optional scope.
+	///
+	/// Returns `None` if the resulting scope would be empty.
 	fn into_scope(self) -> Option<ScopeBuf>;
 }
 
@@ -62,13 +71,16 @@ impl IntoScope for &[ScopeTokenBuf] {
 	}
 }
 
-/// Access Token Scope.
+/// An OAuth 2.0 scope value (borrowed).
+///
+/// A scope is a space-separated list of [`ScopeToken`]s representing the
+/// permissions requested or granted for an access token.
 ///
 /// See: <https://datatracker.ietf.org/doc/html/rfc6749#section-3.3>
 ///
 /// # Grammar
 ///
-/// ```
+/// ```abnf
 /// scope       = scope-token *( SP scope-token )
 /// scope-token = 1*( %x21 / %x23-5B / %x5D-7E )
 /// ```
@@ -77,10 +89,12 @@ impl IntoScope for &[ScopeTokenBuf] {
 pub struct Scope(str);
 
 impl Scope {
+	/// Validates that the given string is a well-formed scope.
 	pub const fn validate_str(s: &str) -> bool {
 		Self::validate_bytes(s.as_bytes())
 	}
 
+	/// Validates that the given byte slice is a well-formed scope.
 	pub const fn validate_bytes(bytes: &[u8]) -> bool {
 		const fn is_scope_token_char(c: u8) -> bool {
 			c == 0x21 || (c >= 0x23 && c <= 0x5b) || (c >= 0x5d && c <= 0x7e)
@@ -116,10 +130,12 @@ impl Scope {
 		true
 	}
 
+	/// Returns `true` if this scope contains the given token.
 	pub fn contains(&self, token: &ScopeToken) -> bool {
 		self.iter().any(|t| t == token)
 	}
 
+	/// Returns an iterator over the individual scope tokens.
 	pub fn iter(&self) -> ScopeIter<'_> {
 		ScopeIter(self.0.split(' '))
 	}
@@ -134,6 +150,7 @@ impl<'a> IntoIterator for &'a Scope {
 	}
 }
 
+/// Iterator over the individual [`ScopeToken`]s in a [`Scope`].
 pub struct ScopeIter<'a>(std::str::Split<'a, char>);
 
 impl<'a> Iterator for ScopeIter<'a> {
@@ -147,6 +164,9 @@ impl<'a> Iterator for ScopeIter<'a> {
 }
 
 impl ScopeBuf {
+	/// Builds a scope from an iterator of scope tokens.
+	///
+	/// Returns `None` if the iterator yields no tokens.
 	pub fn from_tokens<T>(tokens: impl IntoIterator<Item = T>) -> Option<Self>
 	where
 		T: AsRef<ScopeToken>,
@@ -168,6 +188,10 @@ impl ScopeBuf {
 		}
 	}
 
+	/// Inserts a scope token if it is not already present.
+	///
+	/// Returns `true` if the token was inserted, `false` if it was already
+	/// contained.
 	pub fn insert(&mut self, token: &ScopeToken) -> bool {
 		if self.contains(token) {
 			false

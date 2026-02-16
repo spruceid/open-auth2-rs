@@ -2,7 +2,14 @@ use str_newtype::StrNewType;
 
 use super::is_vschar;
 
-/// Client ID.
+/// An OAuth 2.0 client identifier (borrowed).
+///
+/// Client identifiers are unique strings issued to registered clients by the
+/// authorization server, as defined in
+/// [RFC 6749 Section 2.2](https://datatracker.ietf.org/doc/html/rfc6749#section-2.2).
+///
+/// Note that unlike most other OAuth 2.0 string types, a client identifier
+/// may be empty (`*VSCHAR` rather than `1*VSCHAR`).
 ///
 /// # Grammar
 ///
@@ -17,10 +24,12 @@ use super::is_vschar;
 pub struct ClientId(str);
 
 impl ClientId {
+	/// Validates that the given string is a well-formed client identifier.
 	pub const fn validate_str(s: &str) -> bool {
 		Self::validate_bytes(s.as_bytes())
 	}
 
+	/// Validates that the given byte slice is a well-formed client identifier.
 	pub const fn validate_bytes(bytes: &[u8]) -> bool {
 		let mut i = 0;
 

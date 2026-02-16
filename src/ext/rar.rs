@@ -9,7 +9,7 @@ use std::{
 };
 
 use crate::{
-	endpoints::{Redirect, RequestBuilder, SendRequest},
+	endpoints::{HttpRequest, RedirectRequest, RequestBuilder},
 	transport::HttpClient,
 };
 
@@ -23,6 +23,10 @@ pub trait AuthorizationDetailsObject: Serialize + DeserializeOwned {
 	fn r#type(&self) -> &str;
 }
 
+/// Collection of authorization detail objects.
+///
+/// When serialized as part of a form-encoded request, the objects are first
+/// serialized as a JSON array string in the `authorization_details` field.
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(bound = "D: AuthorizationDetailsObject")]
 pub struct AuthorizationDetails<D> {
@@ -54,16 +58,23 @@ impl<D> DerefMut for AuthorizationDetails<D> {
 	}
 }
 
+/// Extension wrapper that attaches authorization details to a request.
+///
+/// The authorization details are serialized alongside the inner request's
+/// fields.
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(bound = "D: AuthorizationDetailsObject, T: Serialize")]
 pub struct WithAuthorizationDetails<'a, D, T> {
+	/// The authorization detail objects to include.
 	pub authorization_details: &'a [D],
 
+	/// The inner request being extended.
 	#[serde(flatten)]
 	pub value: T,
 }
 
 impl<'a, D, T> WithAuthorizationDetails<'a, D, T> {
+	/// Creates a new [`WithAuthorizationDetails`] wrapping the given request.
 	pub fn new(value: T, authorization_details: &'a [D]) -> Self {
 		Self {
 			value,
@@ -86,9 +97,9 @@ impl<'a, D, T> Borrow<T> for WithAuthorizationDetails<'a, D, T> {
 	}
 }
 
-impl<'a, T, D, E> SendRequest<E> for WithAuthorizationDetails<'a, D, T>
+impl<'a, T, D, E> HttpRequest<E> for WithAuthorizationDetails<'a, D, T>
 where
-	T: SendRequest<E>,
+	T: HttpRequest<E>,
 	D: AuthorizationDetailsObject,
 {
 	type ContentType = T::ContentType;
@@ -133,9 +144,9 @@ where
 	}
 }
 
-impl<'a, T, D> Redirect for WithAuthorizationDetails<'a, D, T>
+impl<'a, T, D> RedirectRequest for WithAuthorizationDetails<'a, D, T>
 where
-	T: Redirect,
+	T: RedirectRequest,
 	D: AuthorizationDetailsObject,
 {
 	type RequestBody<'b>
@@ -148,9 +159,13 @@ where
 	}
 }
 
+/// Extension trait for attaching authorization details to a
+/// [`RequestBuilder`].
 pub trait AddAuthorizationDetails<'a, D> {
+	/// The resulting type after adding authorization details.
 	type Output;
 
+	/// Wraps the current request with the given authorization details.
 	fn with_authorization_details(self, authorization_details: &'a [D]) -> Self::Output;
 }
 

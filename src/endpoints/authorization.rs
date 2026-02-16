@@ -1,23 +1,27 @@
-use std::collections::BTreeMap;
+//! OAuth 2.0 authorization endpoint.
+//!
+//! See: <https://datatracker.ietf.org/doc/html/rfc6749#section-3.1>
 
-use iref::{
-	Uri, UriBuf,
-	uri::{Query, QueryBuf},
-};
+use iref::Uri;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-	client::OAuth2Client,
-	endpoints::{Endpoint, Redirect, RequestBuilder},
-	transport::{ContentType, WwwFormUrlEncoded},
-};
+use crate::{client::OAuth2Client, endpoints::Endpoint};
 
+/// The OAuth 2.0 authorization endpoint.
+///
+/// This endpoint is used to interact with the resource owner and obtain an
+/// authorization grant, as defined in
+/// [RFC 6749 Section 3.1](https://datatracker.ietf.org/doc/html/rfc6749#section-3.1).
 pub struct AuthorizationEndpoint<'a, C> {
+	/// The OAuth 2.0 client.
 	pub client: &'a C,
+
+	/// The authorization endpoint URI.
 	pub uri: &'a Uri,
 }
 
 impl<'a, C> AuthorizationEndpoint<'a, C> {
+	/// Creates a new authorization endpoint for the given client and URI.
 	pub fn new(client: &'a C, uri: &'a Uri) -> Self {
 		Self { client, uri }
 	}
@@ -40,11 +44,21 @@ where
 	fn client(&self) -> &Self::Client {
 		self.client
 	}
+
+	fn uri(&self) -> &Uri {
+		self.uri
+	}
 }
 
+/// Trait abstracting over different authorization endpoint types.
+///
+/// This enables code that is generic over both standard authorization
+/// endpoints and pushed authorization endpoints.
 pub trait AnyAuthorizationEndpoint: Endpoint {
+	/// The request wrapper type for this endpoint.
 	type Request<T>;
 
+	/// Wraps a request for this specific authorization endpoint type.
 	fn build_authorization_request<T>(request: T) -> Self::Request<T>;
 }
 
@@ -56,37 +70,6 @@ where
 
 	fn build_authorization_request<T>(request: T) -> Self::Request<T> {
 		request
-	}
-}
-
-impl<'a, C, T> RequestBuilder<AuthorizationEndpoint<'a, C>, T> {
-	pub fn into_uri(self) -> UriBuf
-	where
-		T: Redirect,
-	{
-		let mut uri = self.endpoint.uri.to_owned();
-
-		#[derive(Serialize)]
-		struct WithAuthorizationRequest<T> {
-			#[serde(flatten)]
-			args: BTreeMap<String, String>,
-
-			#[serde(flatten)]
-			authorization_params: T,
-		}
-
-		let query = QueryBuf::new(WwwFormUrlEncoded::encode(&WithAuthorizationRequest {
-			args: serde_html_form::from_str(uri.query().map(Query::as_str).unwrap_or_default())
-				.unwrap(),
-			authorization_params: self.request.build_query(),
-		}))
-		.unwrap();
-
-		if !query.is_empty() {
-			uri.set_query(Some(&query));
-		}
-
-		uri
 	}
 }
 

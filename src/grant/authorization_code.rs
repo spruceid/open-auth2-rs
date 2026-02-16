@@ -9,7 +9,7 @@ use crate::{
 	ClientIdBuf, CodeBuf, IntoScope, ScopeBuf, StateBuf, Stateful,
 	client::{OAuth2Client, OAuth2ClientError},
 	endpoints::{
-		Redirect, RequestBuilder, SendRequest,
+		HttpRequest, RedirectRequest, RequestBuilder,
 		authorization::{AnyAuthorizationEndpoint, AuthorizationEndpoint},
 		token::{TokenEndpoint, TokenResponse},
 	},
@@ -22,6 +22,10 @@ impl<'a, C> AuthorizationEndpoint<'a, C>
 where
 	C: OAuth2Client,
 {
+	/// Begins an Authorization Code authorization request.
+	///
+	/// Returns a [`RequestBuilder`] that can be further extended with state,
+	/// PKCE, or other parameters before being converted into a redirect URI.
 	pub fn authorize_url(
 		self,
 		redirect_uri: Option<UriBuf>,
@@ -38,7 +42,10 @@ where
 	}
 }
 
+/// Extension trait for building an authorization URL on any authorization
+/// endpoint type.
 pub trait ExchangeCode: Sized + AnyAuthorizationEndpoint {
+	/// Begins an Authorization Code authorization request.
 	fn authorize_url(
 		self,
 		redirect_uri: Option<UriBuf>,
@@ -91,6 +98,7 @@ pub struct AuthorizationCodeAuthorizationRequest {
 }
 
 impl AuthorizationCodeAuthorizationRequest {
+	/// Creates a new authorization request with the given parameters.
 	pub fn new(
 		client_id: ClientIdBuf,
 		redirect_uri: Option<UriBuf>,
@@ -103,10 +111,16 @@ impl AuthorizationCodeAuthorizationRequest {
 		}
 	}
 
+	/// Returns the redirect URI to use, falling back to `default_uri` if
+	/// none was specified in the request.
 	pub fn redirect_url<'a>(&'a self, default_uri: Option<&'a Uri>) -> Option<&'a Uri> {
 		self.redirect_uri.as_deref().or(default_uri)
 	}
 
+	/// Grants the authorization request, returning a redirect URI containing
+	/// the authorization code and optional state.
+	///
+	/// Returns `None` if no redirect URI is available.
 	pub fn grant(
 		self,
 		state: Option<StateBuf>,
@@ -123,6 +137,10 @@ impl AuthorizationCodeAuthorizationRequest {
 		Some(url)
 	}
 
+	/// Denies the authorization request, returning a redirect URI containing
+	/// the error response and optional state.
+	///
+	/// Returns `None` if no redirect URI is available.
 	pub fn deny<T>(
 		self,
 		state: Option<StateBuf>,
@@ -140,7 +158,7 @@ impl AuthorizationCodeAuthorizationRequest {
 	}
 }
 
-impl Redirect for AuthorizationCodeAuthorizationRequest {
+impl RedirectRequest for AuthorizationCodeAuthorizationRequest {
 	type RequestBody<'b>
 		= &'b Self
 	where
@@ -172,6 +190,10 @@ impl<'a, C> TokenEndpoint<'a, C>
 where
 	C: OAuth2Client,
 {
+	/// Begins an authorization code token exchange request.
+	///
+	/// Returns a [`RequestBuilder`] that can be further extended (e.g. with
+	/// a PKCE verifier) before being sent.
 	pub fn exchange_code(
 		self,
 		code: CodeBuf,
@@ -208,6 +230,7 @@ pub struct AuthorizationCodeTokenRequest {
 }
 
 impl AuthorizationCodeTokenRequest {
+	/// Creates a new token request with the given parameters.
 	pub fn new(
 		client_id: Option<ClientIdBuf>,
 		code: CodeBuf,
@@ -221,7 +244,7 @@ impl AuthorizationCodeTokenRequest {
 	}
 }
 
-impl<'a, C> SendRequest<TokenEndpoint<'a, C>> for AuthorizationCodeTokenRequest
+impl<'a, C> HttpRequest<TokenEndpoint<'a, C>> for AuthorizationCodeTokenRequest
 where
 	C: OAuth2Client,
 {

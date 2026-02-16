@@ -10,20 +10,28 @@ use sha2::{Digest, Sha256};
 use str_newtype::StrNewType;
 
 use crate::{
-	endpoints::{Redirect, RequestBuilder, SendRequest},
+	endpoints::{HttpRequest, RedirectRequest, RequestBuilder},
 	transport::HttpClient,
 };
 
+/// Extension wrapper that attaches a PKCE code challenge and method to a
+/// request.
+///
+/// Used during the authorization phase to send the `code_challenge` and
+/// `code_challenge_method` parameters.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct WithPkceChallenge<T> {
+	/// The PKCE code challenge and method.
 	#[serde(flatten)]
 	pub pkce: PkceCodeChallengeAndMethod,
 
+	/// The inner request being extended.
 	#[serde(flatten)]
 	pub value: T,
 }
 
 impl<T> WithPkceChallenge<T> {
+	/// Creates a new [`WithPkceChallenge`] wrapping the given request.
 	pub fn new(value: T, pkce: PkceCodeChallengeAndMethod) -> Self {
 		Self { value, pkce }
 	}
@@ -43,9 +51,9 @@ impl<T> std::borrow::Borrow<T> for WithPkceChallenge<T> {
 	}
 }
 
-impl<T> Redirect for WithPkceChallenge<T>
+impl<T> RedirectRequest for WithPkceChallenge<T>
 where
-	T: Redirect,
+	T: RedirectRequest,
 {
 	type RequestBody<'b>
 		= WithPkceChallenge<T::RequestBody<'b>>
@@ -57,9 +65,9 @@ where
 	}
 }
 
-impl<E, T> SendRequest<E> for WithPkceChallenge<T>
+impl<E, T> HttpRequest<E> for WithPkceChallenge<T>
 where
-	T: SendRequest<E>,
+	T: HttpRequest<E>,
 {
 	type ContentType = T::ContentType;
 	type RequestBody<'b>
@@ -100,9 +108,13 @@ where
 	}
 }
 
+/// Extension trait for attaching a PKCE code challenge to a
+/// [`RequestBuilder`].
 pub trait AddPkceChallenge {
+	/// The resulting type after adding the PKCE challenge.
 	type Output;
 
+	/// Wraps the current request with PKCE challenge parameters.
 	fn with_pkce_challenge(self, pkce: PkceCodeChallengeAndMethod) -> Self::Output;
 }
 
@@ -114,15 +126,22 @@ impl<E, T> AddPkceChallenge for RequestBuilder<E, T> {
 	}
 }
 
+/// Extension wrapper that attaches a PKCE code verifier to a token request.
+///
+/// Used during the token exchange phase to send the `code_verifier`
+/// parameter, proving possession of the original challenge.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct WithPkceVerifier<'a, T> {
+	/// The PKCE code verifier.
 	pub pkce_verifier: &'a PkceCodeVerifier,
 
+	/// The inner request being extended.
 	#[serde(flatten)]
 	pub value: T,
 }
 
 impl<'a, T> WithPkceVerifier<'a, T> {
+	/// Creates a new [`WithPkceVerifier`] wrapping the given request.
 	pub fn new(value: T, pkce_verifier: &'a PkceCodeVerifier) -> Self {
 		Self {
 			value,
@@ -145,9 +164,9 @@ impl<'a, T> std::borrow::Borrow<T> for WithPkceVerifier<'a, T> {
 	}
 }
 
-impl<'a, T, E> SendRequest<E> for WithPkceVerifier<'a, T>
+impl<'a, T, E> HttpRequest<E> for WithPkceVerifier<'a, T>
 where
-	T: SendRequest<E>,
+	T: HttpRequest<E>,
 {
 	type ContentType = T::ContentType;
 	type RequestBody<'b>
@@ -189,9 +208,9 @@ where
 	}
 }
 
-impl<'a, T> Redirect for WithPkceVerifier<'a, T>
+impl<'a, T> RedirectRequest for WithPkceVerifier<'a, T>
 where
-	T: Redirect,
+	T: RedirectRequest,
 {
 	type RequestBody<'b>
 		= WithPkceVerifier<'a, T::RequestBody<'b>>
@@ -203,9 +222,13 @@ where
 	}
 }
 
+/// Extension trait for attaching a PKCE code verifier to a
+/// [`RequestBuilder`].
 pub trait AddPkceVerifier<'a> {
+	/// The resulting type after adding the PKCE verifier.
 	type Output;
 
+	/// Wraps the current request with the PKCE code verifier.
 	fn with_pkce_verifier(self, pkce_verifier: &'a PkceCodeVerifier) -> Self::Output;
 }
 
@@ -307,10 +330,13 @@ impl PkceCodeChallengeAndMethod {
 pub struct PkceCodeChallenge(str);
 
 impl PkceCodeChallenge {
+	/// Validates that the given string is a well-formed PKCE code challenge.
 	pub const fn validate_str(s: &str) -> bool {
 		Self::validate_bytes(s.as_bytes())
 	}
 
+	/// Validates that the given byte slice is a well-formed PKCE code
+	/// challenge.
 	pub const fn validate_bytes(bytes: &[u8]) -> bool {
 		validate_verifier_or_challenge(bytes)
 	}
@@ -325,23 +351,32 @@ impl<'a> From<&'a PkceCodeVerifier> for &'a PkceCodeChallenge {
 	}
 }
 
+/// Error returned when parsing an invalid PKCE code challenge method string.
 #[derive(Debug, thiserror::Error)]
 #[error("invalid PKCE `code_challenge_method` value")]
 pub struct InvalidPkceCodeChallengeMethod;
 
+/// String representation of the `plain` code challenge method.
 pub const PKCE_CODE_CHALLENGE_METHOD_PLAIN: &str = "plain";
+
+/// String representation of the `S256` code challenge method.
 pub const PKCE_CODE_CHALLENGE_METHOD_S256: &str = "S256";
 
-/// Code Challenge Method.
+/// PKCE code challenge method.
 ///
 /// See: <https://datatracker.ietf.org/doc/html/rfc7636#section-4.2>
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum PkceCodeChallengeMethod {
+	/// The code challenge is the plain code verifier (not recommended).
 	Plain,
+
+	/// The code challenge is the BASE64URL-encoded SHA-256 hash of the
+	/// code verifier.
 	S256,
 }
 
 impl PkceCodeChallengeMethod {
+	/// Transforms a code verifier into a code challenge using this method.
 	pub fn transform<'a>(&self, code_verifier: &'a PkceCodeVerifier) -> Cow<'a, PkceCodeChallenge> {
 		match self {
 			Self::Plain => Cow::Borrowed(code_verifier.into()),
@@ -352,6 +387,7 @@ impl PkceCodeChallengeMethod {
 		}
 	}
 
+	/// Returns the string representation of this method.
 	pub fn as_str(&self) -> &'static str {
 		match self {
 			Self::Plain => PKCE_CODE_CHALLENGE_METHOD_PLAIN,
@@ -412,10 +448,13 @@ impl<'de> Deserialize<'de> for PkceCodeChallengeMethod {
 pub struct PkceCodeVerifier(str);
 
 impl PkceCodeVerifier {
+	/// Validates that the given string is a well-formed PKCE code verifier.
 	pub const fn validate_str(s: &str) -> bool {
 		Self::validate_bytes(s.as_bytes())
 	}
 
+	/// Validates that the given byte slice is a well-formed PKCE code
+	/// verifier.
 	pub const fn validate_bytes(bytes: &[u8]) -> bool {
 		validate_verifier_or_challenge(bytes)
 	}

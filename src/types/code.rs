@@ -2,7 +2,11 @@ use str_newtype::StrNewType;
 
 use super::is_vschar;
 
-/// Code.
+/// An OAuth 2.0 authorization code (borrowed).
+///
+/// Authorization codes are short-lived credentials returned by the
+/// authorization endpoint and exchanged at the token endpoint, as defined in
+/// [RFC 6749 Section 4.1.2](https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.2).
 ///
 /// # Grammar
 ///
@@ -14,10 +18,12 @@ use super::is_vschar;
 pub struct Code(str);
 
 impl Code {
+	/// Validates that the given string is a well-formed authorization code.
 	pub const fn validate_str(s: &str) -> bool {
 		Self::validate_bytes(s.as_bytes())
 	}
 
+	/// Validates that the given byte slice is a well-formed authorization code.
 	pub const fn validate_bytes(bytes: &[u8]) -> bool {
 		let mut i = 0;
 

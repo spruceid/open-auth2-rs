@@ -8,7 +8,7 @@ use crate::{
 	ClientIdBuf,
 	client::{OAuth2Client, OAuth2ClientError},
 	endpoints::{
-		RequestBuilder, SendRequest,
+		HttpRequest, RequestBuilder,
 		authorization::AnyAuthorizationEndpoint,
 		token::{TokenEndpoint, TokenResponse},
 	},
@@ -19,6 +19,10 @@ impl<'a, C> TokenEndpoint<'a, C>
 where
 	C: OAuth2Client,
 {
+	/// Begins a Pre-Authorized Code token exchange request.
+	///
+	/// Returns a [`RequestBuilder`] that can be further extended before
+	/// being sent.
 	pub fn exchange_pre_authorized_code(
 		self,
 		pre_authorized_code: String,
@@ -35,7 +39,10 @@ where
 	}
 }
 
+/// Extension trait for exchanging a pre-authorized code on any
+/// authorization endpoint type.
 pub trait ExchangePreAuthorizedCode: Sized + AnyAuthorizationEndpoint {
+	/// Begins a Pre-Authorized Code token exchange request.
 	fn exchange_pre_authorized_code(
 		self,
 		pre_authorized_code: String,
@@ -60,7 +67,7 @@ where
 	}
 }
 
-/// Token Request with Pre-Authorized Code Grant.
+/// Token Request with the Pre-Authorized Code Grant.
 ///
 /// See: <https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-token-request>
 #[skip_serializing_none]
@@ -70,15 +77,21 @@ where
 	rename = "urn:ietf:params:oauth:grant-type:pre-authorized_code"
 )]
 pub struct PreAuthorizedCodeTokenRequest {
+	/// Client identifier, if the client is not authenticating by other
+	/// means.
 	pub client_id: Option<ClientIdBuf>,
 
+	/// The pre-authorized code received from the credential issuer.
 	#[serde(rename = "pre-authorized_code")]
 	pub pre_authorized_code: String,
 
+	/// Transaction code for end-user verification, if required by the
+	/// issuer.
 	pub tx_code: Option<String>,
 }
 
 impl PreAuthorizedCodeTokenRequest {
+	/// Creates a new pre-authorized code token request.
 	pub fn new(
 		client_id: Option<ClientIdBuf>,
 		pre_authorized_code: String,
@@ -91,6 +104,7 @@ impl PreAuthorizedCodeTokenRequest {
 		}
 	}
 
+	/// Removes the client identifier, making this an anonymous request.
 	pub fn anonymous(self) -> Self {
 		Self {
 			client_id: None,
@@ -99,7 +113,7 @@ impl PreAuthorizedCodeTokenRequest {
 	}
 }
 
-impl<'a, C> SendRequest<TokenEndpoint<'a, C>> for PreAuthorizedCodeTokenRequest
+impl<'a, C> HttpRequest<TokenEndpoint<'a, C>> for PreAuthorizedCodeTokenRequest
 where
 	C: OAuth2Client,
 {

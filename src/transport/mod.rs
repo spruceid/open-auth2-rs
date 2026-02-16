@@ -1,3 +1,4 @@
+//! HTTP transport layer, content type encoding, and client abstraction.
 use http::{HeaderMap, HeaderValue, header};
 use serde::Serialize;
 
@@ -7,11 +8,17 @@ mod client;
 
 pub use client::*;
 
+/// `Content-Type: application/json` header value.
 pub const APPLICATION_JSON: HeaderValue = HeaderValue::from_static("application/json");
 
+/// `Content-Type: application/x-www-form-urlencoded` header value.
 pub const APPLICATION_X_WWW_FORM_URLENCODED: HeaderValue =
 	HeaderValue::from_static("application/x-www-form-urlencoded");
 
+/// Validates that the response `Content-Type` header matches the expected
+/// value.
+///
+/// Returns an error if the header is missing or does not match.
 pub fn expect_content_type(
 	headers: &HeaderMap,
 	expected_value: &HeaderValue,
@@ -30,12 +37,17 @@ pub fn expect_content_type(
 	}
 }
 
+/// Trait for encoding request bodies with a specific content type.
 pub trait ContentType {
+	/// The `Content-Type` header value, or `None` for requests with no body.
 	const VALUE: Option<HeaderValue>;
 
+	/// Serializes the given value into a byte vector using this content type's
+	/// encoding.
 	fn encode<T: Serialize>(value: &T) -> Vec<u8>;
 }
 
+/// No request body. Used for requests that don't carry a payload.
 pub struct NoContent;
 
 impl ContentType for NoContent {
@@ -46,6 +58,7 @@ impl ContentType for NoContent {
 	}
 }
 
+/// JSON (`application/json`) content type encoding.
 pub struct Json;
 
 impl ContentType for Json {
@@ -56,6 +69,8 @@ impl ContentType for Json {
 	}
 }
 
+/// URL-encoded form (`application/x-www-form-urlencoded`) content type
+/// encoding.
 pub struct WwwFormUrlEncoded;
 
 impl ContentType for WwwFormUrlEncoded {
