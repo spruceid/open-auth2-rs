@@ -1,5 +1,6 @@
 use iref::{Uri, UriBuf, uri_ref};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde_with::skip_serializing_none;
 
 use crate::{
 	// authorization::oauth2::{
@@ -14,7 +15,18 @@ use crate::{
 /// Authorization Server Metadata.
 ///
 /// See: <https://datatracker.ietf.org/doc/html/rfc8414>
+///
+/// Optional metadata parameters that are not supported are omitted entirely:
+/// RFC 8414 §2 defines each metadata value with a concrete JSON type (e.g.
+/// `jwks_uri`, `registration_endpoint`, `revocation_endpoint` and
+/// `introspection_endpoint` are URL strings) and §3.2 returns the metadata as a
+/// JSON object of the supported parameters. Serializing an absent (`None`)
+/// optional parameter as JSON `null` is not a valid value for these typed
+/// members, so the `Option` fields skip serialization when `None` rather than
+/// emitting `null`.
+#[skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[non_exhaustive]
 pub struct AuthorizationServerMetadata<P = NoExtension> {
 	pub issuer: UriBuf,
 
@@ -44,6 +56,19 @@ pub struct AuthorizationServerMetadata<P = NoExtension> {
 
 	pub code_challenge_methods_supported: Option<Vec<PkceCodeChallengeMethod>>,
 
+	/// JSON array of client authentication methods supported by the token
+	/// endpoint (RFC 8414 §2). Extensions may register additional values, such
+	/// as `attest_jwt_client_auth` for attestation-based client authentication.
+	/// If omitted, the default is `client_secret_basic`.
+	#[serde(default = "default_token_endpoint_auth_methods_supported")]
+	pub token_endpoint_auth_methods_supported: Vec<TokenEndpointAuthMethod>,
+
+	/// Whether the authorization server provides the `iss` parameter in the
+	/// authorization response (RFC 9207 §3). When `true`, clients can detect
+	/// mix-up attacks by checking the issuer identifier. Absent defaults to
+	/// `false`, so an issuer that sets the `iss` parameter MUST advertise `true`.
+	pub authorization_response_iss_parameter_supported: Option<bool>,
+
 	#[serde(flatten)]
 	pub extra: P,
 }
@@ -66,6 +91,8 @@ impl<P> AuthorizationServerMetadata<P> {
 			revocation_endpoint: Default::default(),
 			introspection_endpoint: Default::default(),
 			code_challenge_methods_supported: Default::default(),
+			token_endpoint_auth_methods_supported: default_token_endpoint_auth_methods_supported(),
+			authorization_response_iss_parameter_supported: Default::default(),
 			extra: Default::default(),
 		}
 	}
@@ -117,12 +144,36 @@ pub enum GrantType {
 	Extension(String),
 }
 
+/// Client authentication method supported by the token endpoint, as registered
+/// in the IANA "OAuth Token Endpoint Authentication Methods" registry.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum TokenEndpointAuthMethod {
+	None,
+	ClientSecretPost,
+	ClientSecretBasic,
+	ClientSecretJwt,
+	PrivateKeyJwt,
+	/// Mutual-TLS client authentication using a PKI-issued certificate
+	/// (RFC 8705 §2.1).
+	TlsClientAuth,
+	/// Mutual-TLS client authentication using a self-signed certificate
+	/// (RFC 8705 §2.2).
+	SelfSignedTlsClientAuth,
+	#[serde(untagged)]
+	Extension(String),
+}
+
 pub fn default_response_modes_supported() -> Vec<String> {
 	vec!["query".to_owned(), "fragment".to_owned()]
 }
 
 pub fn default_grant_types_supported() -> Vec<GrantType> {
 	vec![GrantType::AuthorizationCode, GrantType::Implicit]
+}
+
+pub fn default_token_endpoint_auth_methods_supported() -> Vec<TokenEndpointAuthMethod> {
+	vec![TokenEndpointAuthMethod::ClientSecretBasic]
 }
 
 #[cfg(feature = "axum")]

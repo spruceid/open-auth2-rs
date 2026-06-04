@@ -4,7 +4,7 @@ use axum::{
 	Form,
 	body::Body,
 	extract::{Query, State},
-	http::{StatusCode, header::CONTENT_TYPE},
+	http::{HeaderMap, StatusCode, header::CONTENT_TYPE},
 	response::{IntoResponse, Response},
 	routing::{get, post},
 };
@@ -90,8 +90,15 @@ pub trait OAuth2Server: Sized + Send + Sync + 'static {
 		request: Stateful<Self::AuthorizationRequest>,
 	) -> impl Send + Future<Output = impl IntoResponse>;
 
+	/// Token endpoint.
+	///
+	/// The request `headers` are provided because the token endpoint may need to
+	/// process HTTP headers carrying client/key-binding material, such as the
+	/// `DPoP` header (RFC 9449) or `OAuth-Client-Attestation`(-PoP) headers
+	/// (Attestation-Based Client Authentication).
 	fn token(
 		&self,
+		headers: HeaderMap,
 		token_request: Self::TokenRequest,
 	) -> impl Send + Future<Output = Result<Self::TokenResponse, OAuth2ServerError>>;
 }
@@ -137,12 +144,13 @@ where
 /// Token Request endpoint.
 async fn token<S>(
 	State(server): State<Arc<S>>,
+	headers: HeaderMap,
 	Form(token_request): Form<S::TokenRequest>,
 ) -> impl IntoResponse
 where
 	S: OAuth2Server,
 {
-	server.token(token_request).await.map(|response| {
+	server.token(headers, token_request).await.map(|response| {
 		Response::builder()
 			.status(StatusCode::OK)
 			.header(CONTENT_TYPE, &APPLICATION_JSON)

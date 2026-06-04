@@ -3,7 +3,9 @@
 //! related extensions:
 //!
 //! - [RFC 7636][rfc7636] — Proof Key for Code Exchange (PKCE)
+//! - [RFC 8414][rfc8414] — Authorization Server Metadata
 //! - [RFC 9126][rfc9126] — Pushed Authorization Requests (PAR)
+//! - [RFC 9207][rfc9207] — Authorization Server Issuer Identification
 //! - [RFC 9396][rfc9396] — Rich Authorization Requests (RAR)
 //! - [OpenID4VCI][oid4vci] — Pre-Authorized Code Grant
 //!
@@ -12,7 +14,9 @@
 //!
 //! [rfc6749]: https://datatracker.ietf.org/doc/html/rfc6749
 //! [rfc7636]: https://datatracker.ietf.org/doc/html/rfc7636
+//! [rfc8414]: https://www.rfc-editor.org/rfc/rfc8414.html
 //! [rfc9126]: https://www.rfc-editor.org/rfc/rfc9126.html
+//! [rfc9207]: https://www.rfc-editor.org/rfc/rfc9207.html
 //! [rfc9396]: https://www.rfc-editor.org/rfc/rfc9396.html
 //! [oid4vci]: https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html
 //!
