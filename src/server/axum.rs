@@ -9,74 +9,123 @@ use axum::{
 	routing::{get, post},
 };
 use iref::uri::Path;
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{Serialize, de::DeserializeOwned};
 
 use crate::{
 	Stateful, endpoints::pushed_authorization::PushedAuthorizationResponse, server::ErrorResponse,
 	transport::APPLICATION_JSON,
 };
 
-use super::AuthorizationServerMetadata;
+use super::{AuthorizationServerMetadata, ErrorCode};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ErrorCode {
-	InvalidRequest,
-	InvalidClient,
-	InvalidGrant,
-	UnauthorizedClient,
-	UnsupportedGrantType,
-	InvalidScope,
-}
-
+/// OAuth2 server error.
 pub enum OAuth2ServerError {
+	/// The requested resource could not be found.
+	///
+	/// See: <https://openid.net/specs/openid-federation-1_0.html#section-8.9>
 	NotFound,
+
+	/// The request is malformed.
+	///
+	/// See: <https://datatracker.ietf.org/doc/html/rfc6749#section-5.2>
 	InvalidRequest,
+
+	/// Client authentication failed.
+	///
+	/// See: <https://datatracker.ietf.org/doc/html/rfc6749#section-5.2>
 	InvalidClient,
+
+	/// The authorization grant or refresh token is invalid.
+	///
+	/// See: <https://datatracker.ietf.org/doc/html/rfc6749#section-5.2>
 	InvalidGrant,
+
+	/// The client is not authorized to use this grant type.
+	///
+	/// See: <https://datatracker.ietf.org/doc/html/rfc6749#section-5.2>
 	UnauthorizedClient,
+
+	/// The resource owner or authorization server denied the request.
+	///
+	/// See: <https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.2.1>
+	AccessDenied,
+
+	/// The authorization server does not support this response type.
+	///
+	/// See: <https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.2.1>
+	UnsupportedResponseType,
+
+	/// The authorization grant type is not supported.
+	///
+	/// See: <https://datatracker.ietf.org/doc/html/rfc6749#section-5.2>
 	UnsupportedGrantType,
+
+	/// The requested scope is invalid, unknown, or malformed.
+	///
+	/// See: <https://datatracker.ietf.org/doc/html/rfc6749#section-5.2>
 	InvalidScope,
+
+	/// The server is temporarily overloaded or under maintenance.
+	///
+	/// See: <https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.2.1>
+	TemporarilyUnavailable,
+
+	/// Internal server error.
+	///
+	/// See: <https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.2.1>
+	Internal(String),
 }
 
 impl OAuth2ServerError {
-	pub fn as_error_code(&self) -> Option<ErrorCode> {
+	pub fn internal(e: impl ToString) -> Self {
+		Self::Internal(e.to_string())
+	}
+
+	pub fn as_error_code(&self) -> ErrorCode {
 		match self {
-			Self::NotFound => None,
-			Self::InvalidRequest => Some(ErrorCode::InvalidRequest),
-			Self::InvalidClient => Some(ErrorCode::InvalidClient),
-			Self::InvalidGrant => Some(ErrorCode::InvalidGrant),
-			Self::UnauthorizedClient => Some(ErrorCode::UnauthorizedClient),
-			Self::UnsupportedGrantType => Some(ErrorCode::UnsupportedGrantType),
-			Self::InvalidScope => Some(ErrorCode::InvalidScope),
+			Self::NotFound => ErrorCode::NotFound,
+			Self::InvalidRequest => ErrorCode::InvalidRequest,
+			Self::InvalidClient => ErrorCode::InvalidClient,
+			Self::InvalidGrant => ErrorCode::InvalidGrant,
+			Self::UnauthorizedClient => ErrorCode::UnauthorizedClient,
+			Self::AccessDenied => ErrorCode::AccessDenied,
+			Self::UnsupportedResponseType => ErrorCode::UnsupportedResponseType,
+			Self::UnsupportedGrantType => ErrorCode::UnsupportedGrantType,
+			Self::InvalidScope => ErrorCode::InvalidScope,
+			Self::TemporarilyUnavailable => ErrorCode::TemporarilyUnavailable,
+			Self::Internal(_) => ErrorCode::ServerError,
 		}
 	}
 
 	pub fn status_code(&self) -> StatusCode {
 		match self {
 			Self::NotFound => StatusCode::NOT_FOUND,
+			Self::TemporarilyUnavailable => StatusCode::SERVICE_UNAVAILABLE,
+			Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
 			_ => StatusCode::BAD_REQUEST,
+		}
+	}
+
+	pub fn description(&self) -> Option<&str> {
+		match self {
+			Self::Internal(e) => Some(e),
+			_ => None,
 		}
 	}
 }
 
 impl IntoResponse for OAuth2ServerError {
 	fn into_response(self) -> Response {
-		let error = match self.as_error_code() {
-			Some(code) => code,
-			None => {
-				return Response::builder()
-					.status(self.status_code())
-					.body(Body::empty())
-					.unwrap();
-			}
-		};
-
 		Response::builder()
 			.status(self.status_code())
 			.header(CONTENT_TYPE, &APPLICATION_JSON)
 			.body(Body::from(
-				serde_json::to_vec(&ErrorResponse::new(error, None, None)).unwrap(),
+				serde_json::to_vec(&ErrorResponse::new(
+					self.as_error_code(),
+					self.description().map(ToOwned::to_owned),
+					None,
+				))
+				.unwrap(),
 			))
 			.unwrap()
 	}
