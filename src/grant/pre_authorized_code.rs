@@ -13,6 +13,13 @@ use crate::{
 	transport::{APPLICATION_JSON, HttpClient, WwwFormUrlEncoded, expect_content_type},
 };
 
+/// The `grant_type` value used to request a token via the Pre-Authorized
+/// Code Grant.
+///
+/// See: <https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-token-request>
+pub const GRANT_TYPE_PRE_AUTHORIZED_CODE: &str =
+	"urn:ietf:params:oauth:grant-type:pre-authorized_code";
+
 impl<'a, C> TokenEndpoint<'a, C>
 where
 	C: OAuth2Client,
