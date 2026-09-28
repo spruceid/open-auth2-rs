@@ -147,15 +147,12 @@ impl AuthorizationCodeAuthorizationRequest {
 	/// the error response and optional state.
 	///
 	/// Returns `None` if no redirect URI is available.
-	pub fn deny<T>(
+	pub fn deny(
 		self,
 		state: Option<StateBuf>,
-		error: ErrorResponse<T>,
+		error: ErrorResponse,
 		redirect_uri: Option<&Uri>,
-	) -> Option<UriBuf>
-	where
-		T: Serialize,
-	{
+	) -> Option<UriBuf> {
 		let mut url = self.redirect_url(redirect_uri)?.to_owned();
 
 		extend_uri_query(&mut url, Stateful::new(error, state));
