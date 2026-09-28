@@ -18,6 +18,12 @@ use crate::{
 	util::extend_uri_query,
 };
 
+/// The `grant_type` value used to request a token via the Authorization
+/// Code Grant.
+///
+/// See: <https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3>
+pub const GRANT_TYPE_AUTHORIZATION_CODE: &str = "authorization_code";
+
 impl<'a, C> AuthorizationEndpoint<'a, C>
 where
 	C: OAuth2Client,
